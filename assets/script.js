@@ -5,12 +5,15 @@ const rm_el=(parentelement,selector)=>{
         });
     }else{ parentelement.querySelectorAll(selector).forEach((el,i)=>{ el.remove(); }); }
 }
+const dump=(x)=>{
+    var v=Object.keys({x}); console.log(v,`:${x}`);
+}
 const mkParallax = (prm)=>{
     var windowHeight = window.innerHeight, 
     windowHeightExtra = 0, 
     safari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent),
     mobile = /Mobi/.test(navigator.userAgent);
-
+    dump(windowHeight);
     safari && 
     !mobile && 
     (windowHeightExtra = window.outerHeight - window.innerHeight),
@@ -72,3 +75,16 @@ const mkParallax = (prm)=>{
     PLX.par=Object.assign(PLX.par,prm);
     PLX.init();
 };
+document.addEventListener("DOMContentLoaded", ()=>{
+    mkParallax({ speed: 3 });	
+    document.querySelectorAll("[href^='#']").forEach(x=>{
+        x.addEventListener('click',e=>{
+            try{
+                var to=e.target.href.split("#")[1];
+                console.log(`doing scroll to "${to}"`)
+                document.getElementById(to).scrollIntoView({behavior: "smooth"});
+                e.preventDefault();
+            }catch(xc){ }
+        });
+    });
+});
