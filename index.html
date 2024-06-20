@@ -195,7 +195,10 @@ request.post(
    
 const dfMessenger = document.querySelector('df-messenger');
 window.addEventListener('load',()=>{
-    
+    var styf=document.createElement("style");
+    styf.innerText=`img:hover{ transform:perspective(70em) rotateX(-5deg) translatey(-5px) scale(1.1); }`;
+    dfMessenger.children[0].shadowRoot.prepend(styf);
+    dfMessenger.children[0].shadowRoot.querySelector(".chat-wrapper").style.bottom='-45px';
 });
 </script>
 </html>
