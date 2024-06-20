@@ -171,27 +171,27 @@ agent-id="e8789330-4a4b-4401-b8bc-cfe23e6bcc79">
 </df-messenger>
     </body>
     <script type="text/javascript">
-request.get(
-    'http://localhost/~heriawan/0gogs/Reborn/setting/orgs?page=', 
-).then(r => { console.log("default",r.result, r); });
+// request.get(
+//     'http://localhost/~heriawan/0gogs/Reborn/setting/orgs?page=', 
+// ).then(r => { console.log("default",r.result, r); });
 
-request.get(
-    'http://localhost/~heriawan/0gogs/Reborn/setting/orgs?page=',
-    { "Accept": "application/json", },
-    {id:'a','name':2}
-).then(r => { console.log(r.result,r); });
+// request.get(
+//     'http://localhost/~heriawan/0gogs/Reborn/setting/orgs?page=',
+//     { "Accept": "application/json", },
+//     {id:'a','name':2}
+// ).then(r => { console.log(r.result,r); });
 
-request.post(
-    'http://localhost/~heriawan/0gogs/sg2/master/airline',
-    { 
-        "Accept": "application/json",
-        "SG2BU": "CTAMQ",
-        "Authorization": "Basic cm9vdDphc2Q=",
-    },
-    {iata:'GA'}
-).then(r => {
-    console.log(r.result);
-});
+// request.post(
+//     'http://localhost/~heriawan/0gogs/sg2/master/airline',
+//     { 
+//         "Accept": "application/json",
+//         "SG2BU": "CTAMQ",
+//         "Authorization": "Basic cm9vdDphc2Q=",
+//     },
+//     {iata:'GA'}
+// ).then(r => {
+//     console.log(r.result);
+// });
    
 const dfMessenger = document.querySelector('df-messenger');
 window.addEventListener('load',()=>{
