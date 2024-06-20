@@ -14,7 +14,7 @@
         </script>
         <style>
             df-messenger {
-                z-index: 999; position: fixed; bottom: -5px; right: 10px;
+                z-index: 999; position: fixed; bottom: 45px; right: 10px;
                 --df-messenger-font-color: #333;
                 --df-messenger-font-family: Google Sans;
                 --df-messenger-titlebar-background:#a4cdf9;
@@ -198,7 +198,7 @@ window.addEventListener('load',()=>{
     var styf=document.createElement("style");
     styf.innerText=`img:hover{ transform:perspective(70em) rotateX(-5deg) translatey(-5px) scale(1.1); }`;
     dfMessenger.children[0].shadowRoot.prepend(styf);
-    dfMessenger.children[0].shadowRoot.querySelector(".chat-wrapper").style.bottom='-45px';
+    dfMessenger.children[0].shadowRoot.querySelector(".chat-wrapper").style.bottom='0px';
 });
 </script>
 </html>
