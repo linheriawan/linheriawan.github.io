@@ -3,12 +3,35 @@
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <link rel="icon" href="./favicon.ico">
+        <link rel="stylesheet" href="https://www.gstatic.com/dialogflow-console/fast/df-messenger/prod/v1/themes/df-messenger-default.css">
+        <script src="https://www.gstatic.com/dialogflow-console/fast/df-messenger/prod/v1/df-messenger.js"></script>
         <link rel="stylesheet" href="assets/style.css">
         <title>Heriawan</title>
         <script src="assets/script.js" type="text/javascript"></script>
+        <script src="assets/fetchy.js" type="text/javascript"></script>
         <script type="text/javascript">
 
         </script>
+        <style>
+            df-messenger {
+                z-index: 999; position: fixed; bottom: -5px; right: 10px;
+                --df-messenger-font-color: #333;
+                --df-messenger-font-family: Google Sans;
+                --df-messenger-titlebar-background:#a4cdf9;
+                --df-messenger-titlebar-padding:0 5px;
+                --df-messenger-titlebar-icon-height:36px;
+                --df-messenger-titlebar-icon-width:36px;
+                --df-messenger-titlebar-icon-padding:0;
+                --df-messenger-chat-background: #bcffe5;
+                --df-messenger-message-user-background: #e3ddff;
+                --df-messenger-message-bot-background: #fffdf0;
+                --df-messenger-input-background:#cff9ff;
+                --df-messenger-input-padding:8px;
+                --df-messenger-chat-bubble-background:'none';
+                --df-messenger-chat-bubble-icon-size:150px;
+                --df-messenger-internal-chat-window-offset:150px;
+            }
+        </style>
     </head>
     <body class="t-hm bg-blue-900 text-white">
         <header class="bg-blue-800 grid grid-cols-1 md:grid-cols-2 py-1 px-3 ">
@@ -138,37 +161,41 @@
                 </div>
             </footer>    
         </main>
-        
+<df-messenger location="us-central1" project-id="chatproject-426904" language-code="en" max-query-length="-1"
+agent-id="e8789330-4a4b-4401-b8bc-cfe23e6bcc79">
+    <df-messenger-chat-bubble
+    chat-icon="Tania.png" 
+    chat-title-icon="Tania-head.png" 
+    chat-title="Tania - IAS"
+    chat-subtitle="#ElevateAviationJourney"> </df-messenger-chat-bubble>
+</df-messenger>
     </body>
     <script type="text/javascript">
-// request.get(
-//     'http://localhost/~heriawan/0gogs/Reborn/setting/orgs?page=', 
-// ).then(r => { console.log("default",r.result, r); });
+request.get(
+    'http://localhost/~heriawan/0gogs/Reborn/setting/orgs?page=', 
+).then(r => { console.log("default",r.result, r); });
 
-// request.get(
-//     'http://localhost/~heriawan/0gogs/Reborn/setting/orgs?page=',
-//     { "Accept": "application/json", },
-//     {id:'a','name':2}
-// ).then(r => { console.log(r.result,r); });
+request.get(
+    'http://localhost/~heriawan/0gogs/Reborn/setting/orgs?page=',
+    { "Accept": "application/json", },
+    {id:'a','name':2}
+).then(r => { console.log(r.result,r); });
 
-
-// request.post(
-//     'http://localhost/~heriawan/0gogs/sg2/master/airline',
-//     { 
-//         "Accept": "application/json",
-//         "SG2BU": "CTAMQ",
-//         "Authorization": "Basic cm9vdDphc2Q=",
-//     },
-//     {iata:'GA'}
-// ).then(r => {
-//     console.log(r.result);
-// });
-// request.post(
-//     'http://localhost/~heriawan/0gogs/sg2/auth/basic',
-//     { "Accept": "application/json", },
-//     {username:'root','password':'asd'}
-// ).then(r => {
-//     console.log(r.result, r);
-// });
-    </script>
+request.post(
+    'http://localhost/~heriawan/0gogs/sg2/master/airline',
+    { 
+        "Accept": "application/json",
+        "SG2BU": "CTAMQ",
+        "Authorization": "Basic cm9vdDphc2Q=",
+    },
+    {iata:'GA'}
+).then(r => {
+    console.log(r.result);
+});
+   
+const dfMessenger = document.querySelector('df-messenger');
+window.addEventListener('load',()=>{
+    
+});
+</script>
 </html>
