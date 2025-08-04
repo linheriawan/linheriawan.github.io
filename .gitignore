@@ -3,3 +3,7 @@ assets/base.css
 tailwind.config.js
 tailwindcss
 assets/PnM.xcf
+
+.DS_Store
+.DS_Store?
+._*
