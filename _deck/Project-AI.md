@@ -290,7 +290,7 @@ class LocalAI(context: Context) {
 
 ---
 <!-- _class: m-slide -->
-![bg left:50%](../assets/solution-teamwork.jpg)
+![bg left:50%](assets/solution-teamwork.jpg)
 ## Flexible Application Types
 1. **ERP Configuration**  
    - Inventory management with AI predictions  
@@ -344,7 +344,7 @@ self.addEventListener('fetch', event => {
 ---
 <!-- Potential Issues & Solutions -->
 <!-- _class: m-slide -->
-![bg left:40%](../assets/AI/risk-mitigation-puzzle.jpg)
+![bg left:40%](assets/AI/risk-mitigation-puzzle.jpg)
 ## Potential Issues & Solutions
 
 1. **Browser Limitations**  
