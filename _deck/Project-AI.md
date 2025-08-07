@@ -1,24 +1,25 @@
 ---
 marp: true
 theme: default
-paginate: true
-color: black
-background-color: white
+paginate: true 
 style: |
-  header,footer {position:absolute; left:10px; right:0px;}
-  header { top:0px; text-align:right;}
-  footer { bottom:10px; }
-  
+  header,footer {position:absolute; right:0px;padding:0;margin:0;background-color:#00000011}
+  header { top:0px; left:0; text-align:right;}
+  footer { bottom:0px;left:0; padding-left:10px }
+  section.img-left p img {float:left;object-position:right center;object-fit: cover; height:580px; width:300px;}
+  section.img-right p img {float:right;object-position:left center;object-fit: cover; height:580px; width:300px;}
+
   h3,li p {margin-bottom:.2em;}
   p {margin-top:.3em;}  
   ul li, ol li{line-height:1.1;}
-  section { font-size: 1.8em; }
+  section { align-content: baseline;padding-top:150px;font-size: 1.8em; }
+  section h1 {position:absolute;top:30px;}
   section.m-slide p, section.h-slide p{margin:0}
-  
+
   section.s-slide p{font-size:1.4em}
   section.s-slide strong{color:blue}
   section.s-slide h1,section.s-slide h5{font-size:3em;color:green}
-  
+
   section.m-slide {font-size:1.4em}
   section.m-slide h2{ font-size:2em}
   section.h-slide pre{font-size:.6em}
@@ -26,11 +27,11 @@ style: |
   section.h-slide {font-size:1.2em}
   section.h-slide h2{font-size:1.5em;}
   section.h-slide pre{font-size:50%}  
-  
-header: "![image height:150px](./assets/ak'sara.svg)"
-footer: '_by_ **Ak`sara**'  
+header: | 
+  ![h:100px](./assets/ak'sara.svg)
+footer: |
+  _by_ **Ak`sara**
 ---
-
 <!-- Cover Slide -->
 ![bg opacity:.6](assets/AI/ai-for-web.jpg)
 # Multi-Platform AI-Enabled 
@@ -70,9 +71,9 @@ that is us.., making commitment to **work smart**
 and start with utilising AI App stack
 
 ---
-<!-- _class: m-slide -->
+<!-- _class: h-slide img-left  -->
 <!-- Architecture Design -->
-![bg left:30%](assets/conceptual.avif)
+![](assets/conceptual.avif)
 # Architecture Design 
 AI Deployment Strategies
 1 **Centralized AI Server**  
@@ -95,8 +96,9 @@ When to use: Privacy-first, offline capability, low latency
 
 ---
 <!-- Server Component -->
-<!-- _class: m-slide -->
-## Server Component (Optional AI Backend)
+<!-- _class: m-slide img-right -->
+![](assets/AI/virtual-servers.avif)
+# Server Component (Optional AI Backend)
 
 **Technology Stack:**  
 - Framework: FastAPI (Python) or Express (Node.js)  
@@ -111,13 +113,13 @@ When to use: Privacy-first, offline capability, low latency
 - Training/fine-tuning pipelines  
 - Analytics and insights generation  
 - Collaborative AI features  
-![bg right:50%](assets/AI/virtual-servers.avif)
+
 
 ---
 <!-- Web Client -->
 <!-- _class: m-slide -->
 ![bg left:40%](assets/AI/responsive.webp)
-## Web Client
+# Web Client
 
 **Technology Stack:**  
 - Framework: SvelteKit / Next.js / Vue 3  
@@ -142,11 +144,10 @@ When to use: Privacy-first, offline capability, low latency
 - Real-time translation  
 
 ---
-
 <!-- Android Client -->
 <!-- _class: m-slide -->
 ![bg right:50%](assets/AI/AI-Edge.png)
-## Android Client
+# Android Client
 
 **Technology Stack:**  
 - Language: Kotlin / Java  
@@ -170,10 +171,9 @@ When to use: Privacy-first, offline capability, low latency
 - Accelerated inference via NPU/GPU  
 
 ---
-
 <!-- Python CLI -->
 ![bg left:40%](assets/AI/nice-term.png)
-## Python CLI
+# Python CLI
 
 **Technology Stack:**  
 - Framework: Typer / Click / Python-Fire  
@@ -196,7 +196,7 @@ When to use: Privacy-first, offline capability, low latency
 
 ---
 ![bg left:40%](assets/AI/server-ai.avif)
-## Implementation Roadmap (Cont.)
+# Implementation Roadmap (Cont.)
 **Phase 1: Foundation (Weeks 1-3)**  
 - **Core Framework:**  
   - Business logic abstraction layer  
@@ -210,7 +210,7 @@ When to use: Privacy-first, offline capability, low latency
 
 ---
 ![bg right:40%](assets/production-flowchart.avif)
-## Implementation Roadmap (Cont.)
+# Implementation Roadmap (Cont.)
 **Phase 2: Business Features (Weeks 4-6)**  
 - **Configurable Modules:**  
   - Entity management (customers, inventory, etc.)  
@@ -224,7 +224,7 @@ When to use: Privacy-first, offline capability, low latency
 
 ---
 ![bg left:35%](assets/enhance.avif)
-## Implementation Roadmap (Cont.)
+# Implementation Roadmap (Cont.)
 **Phase 3: Advanced AI (Weeks 7-9)**  
 - **Local Model Deployment:**  
   - Model optimization (quantization, pruning)  
@@ -237,7 +237,7 @@ When to use: Privacy-first, offline capability, low latency
 
 ---
 ![bg right:35%](assets/api-illustration.avif)
-## Implementation Roadmap (Cont.)
+# Implementation Roadmap (Cont.)
 **Phase 4: Platform Expansion (Weeks 10-12)**  
 - **Cross-Platform Features:**  
   - Unified AI model format  
@@ -255,7 +255,7 @@ When to use: Privacy-first, offline capability, low latency
 <!-- _class: m-slide -->
 <!-- Client-Side AI Implementation -->
 ![bg left:40%](assets/AI/mi-glasses-ai.jpeg)
-## Client-Side AI Implementation  
+# Client-Side AI Implementation  
 
 **Web Browser AI Stack**  
 ```js
@@ -290,8 +290,8 @@ class LocalAI(context: Context) {
 
 ---
 <!-- _class: m-slide -->
-![bg left:50%](assets/solution-teamwork.jpg)
-## Flexible Application Types
+![bg left:50%](../assets/solution-teamwork.jpg)
+# Flexible Application Types
 1. **ERP Configuration**  
    - Inventory management with AI predictions  
    - Supply chain optimization  
@@ -315,8 +315,7 @@ class LocalAI(context: Context) {
 <!-- Key Recommendations -->
 <!-- _class: m-slide -->
 ![bg right:45%](assets/business-strategy.avif)
-
-## Key Recommendations
+# Key Recommendations
 1. **Model Selection Strategy**  
 For Client-Side Deployment:
     - Quantized models (INT8/INT4)  
@@ -344,8 +343,8 @@ self.addEventListener('fetch', event => {
 ---
 <!-- Potential Issues & Solutions -->
 <!-- _class: m-slide -->
-![bg left:40%](assets/AI/risk-mitigation-puzzle.jpg)
-## Potential Issues & Solutions
+![bg left:40%](../assets/AI/risk-mitigation-puzzle.jpg)
+# Potential Issues & Solutions
 
 1. **Browser Limitations**  
    - Issue: Memory constraints, no GPU access  
@@ -376,8 +375,7 @@ self.addEventListener('fetch', event => {
 
 <!-- Development Tools -->
 ![bg right:50%](assets/develop.avif)
-
-## Development Tools
+# Development Tools
 
 **AI Model Optimization**  
 - Quantization: TensorFlow Lite Converter  
@@ -395,8 +393,7 @@ self.addEventListener('fetch', event => {
 
 <!-- Future Possibilities -->
 ![bg left:40%](assets/future.jpeg)
-
-## Future Possibilities
+# Future Possibilities
 
 **Emerging Technologies**  
 - WebGPU for 10x faster browser AI  
