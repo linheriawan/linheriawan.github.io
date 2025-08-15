@@ -1,17 +1,13 @@
 <script lang="ts">
 	import '../app.css';
+	import type { Snippet } from 'svelte';
+
+	interface Props {
+		children: Snippet;
+	}
+
+	let { children }: Props = $props();
 </script>
 <main>
-	<slot />
+	{@render children()}
 </main>
-
-<style>
-	main {
-		height: 100vh;
-		display: flex;
-		margin: 0;
-		padding: 0;
-		font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-		overflow: hidden;
-	}
-</style>
