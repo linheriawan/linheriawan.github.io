@@ -6,7 +6,12 @@
 	import MathRenderer from './renderers/MathRenderer.svelte';
 	import ImageRenderer from './renderers/ImageRenderer.svelte';
 	import ChartRenderer from './renderers/ChartRenderer.svelte';
-	import MarpRenderer from './renderers/MarpRenderer.svelte';
+	import TableRenderer from './renderers/TableRenderer.svelte';
+	import PDFRenderer from './renderers/PDFRenderer.svelte';
+	import TimelineRenderer from './renderers/TimelineRenderer.svelte';
+	import MediaRenderer from './renderers/MediaRenderer.svelte';
+	import URLPreviewRenderer from './renderers/URLPreviewRenderer.svelte';
+	import FileRenderer from './renderers/FileRenderer.svelte';
 
 	interface Props {
 		content: string;
@@ -23,9 +28,15 @@
 	let hasImage = $state<boolean>(false);
 	let hasChart = $state<boolean>(false);
 	let hasMarp = $state<boolean>(false);
+	let hasTable = $state<boolean>(false);
+	let hasPDF = $state<boolean>(false);
+	let hasTimeline = $state<boolean>(false);
+	let hasMedia = $state<boolean>(false);
+	let hasUrlPreview = $state<boolean>(false);
+	let hasFile = $state<boolean>(false);
 	let processedContent = $state<string>('');
 
-	// Robust content analysis with safety checks
+	// Simplified content analysis - only check for ```[keyword] patterns
 	function analyzeContent(text: string) {
 		if (!text || typeof text !== 'string') {
 			resetFlags();
@@ -37,37 +48,26 @@
 		const analysisText = text.length > maxAnalysisSize ? text.substring(0, maxAnalysisSize) : text;
 
 		try {
-			// Check for Marp presentations (check first!)
-			hasMarp = /```marp[\s\S]*?```/i.test(analysisText) || /^---\s*marp:\s*true/m.test(analysisText) || analysisText.includes('<!-- theme:') || analysisText.includes('<!-- paginate:');
-
-			// Check for Charts (check second!)
-			hasChart = /```(?:chart|json)[\s\S]*?```/i.test(analysisText) || (/type:\s*(line|bar|pie|doughnut|radar|scatter|bubble)/i.test(analysisText) && /data:/.test(analysisText));
-
-			// Check for Mermaid diagrams
+			// Check for code block patterns only
+			hasMarp = /```marp[\s\S]*?```/i.test(analysisText);
+			hasChart = /```chart[\s\S]*?```/i.test(analysisText);
+			hasTable = /```(?:table|csv)[\s\S]*?```/i.test(analysisText);
 			hasMermaid = /```mermaid[\s\S]*?```/i.test(analysisText);
+			hasTimeline = /```timeline[\s\S]*?```/i.test(analysisText);
+			hasPDF = /```pdf[\s\S]*?```/i.test(analysisText);
+			hasMedia = /```(?:video|audio)[\s\S]*?```/i.test(analysisText);
+			hasFile = /```file[\s\S]*?```/i.test(analysisText);
+			hasUrlPreview = /```url[\s\S]*?```/i.test(analysisText);
+			hasImage = /```image[\s\S]*?```/i.test(analysisText);
 
-			// Check for code blocks (but not mermaid, chart, or marp)
-			hasCode = /```(?!mermaid|chart|json|marp)[\w]*[\s\S]*?```/i.test(analysisText);
+			// Check for code blocks (excluding special keywords)
+			hasCode = /```(?!marp|chart|table|csv|mermaid|timeline|pdf|video|audio|file|url|image)[\w]*[\s\S]*?```/i.test(analysisText);
 
-			// Check for math formulas (LaTeX) - improved patterns
+			// Check for math formulas (LaTeX) - keep this as it uses different syntax
 			hasMath = /\$\$[\s\S]*?\$\$|\$[^$\n]+\$|\\begin\{[^}]+\}[\s\S]*?\\end\{[^}]+\}|\\[[\s\S]*?\\]|\\([^)]*\\)/.test(analysisText);
 
-			// Check for image URLs or base64 - more robust
-			const trimmedText = text.trim();
-			hasImage = /^(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?[^\s]*)?|data:image\/[^;]+;base64,)/i.test(trimmedText);
-
-			// Check for markdown (improved detection)
+			// Check for markdown (improved detection) - keep for mixed content
 			hasMarkdown = /^#{1,6}\s|[\*_]{1,2}[^\*_]+[\*_]{1,2}|`[^`]+`|\[[^\]]*\]\([^)]*\)|^[-\*\+]\s|\d+\.\s/m.test(analysisText) && text.length > 5;
-
-			// If it's only an image URL, don't treat it as other content types
-			if (hasImage && /^(https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|webp|svg|bmp)(\?[^\s]*)?|data:image\/[^;]+;base64,)$/i.test(trimmedText)) {
-				hasMarkdown = false;
-				hasCode = false;
-				hasMermaid = false;
-				hasMath = false;
-				hasChart = false;
-				hasMarp = false;
-			}
 
 		} catch (error) {
 			console.error('Content analysis error:', error);
@@ -83,6 +83,12 @@
 		hasImage = false;
 		hasChart = false;
 		hasMarp = false;
+		hasTable = false;
+		hasPDF = false;
+		hasTimeline = false;
+		hasMedia = false;
+		hasUrlPreview = false;
+		hasFile = false;
 	}
 
 	onMount(() => {
@@ -100,22 +106,32 @@
 <div class="message-renderer" class:user-message={sender === 'user'} class:ai-message={sender === 'ai'}>
 	{#if hasImage}
 		<ImageRenderer {content} />
-	{:else if hasMarp && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasChart}
-		<!-- Pure Marp presentation content -->
-		<MarpRenderer {content} />
-	{:else if hasChart && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasMarp}
+	{:else if hasPDF}
+		<PDFRenderer {content} />
+	{:else if hasMedia}
+		<MediaRenderer {content} />
+	{:else if hasFile}
+		<FileRenderer {content} />
+	{:else if hasUrlPreview}
+		<URLPreviewRenderer {content} />
+	{:else if hasTimeline}
+		<TimelineRenderer {content} />
+	{:else if hasChart && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasMarp && !hasTable}
 		<!-- Pure chart content -->
 		<ChartRenderer {content} />
-	{:else if hasMermaid && !hasMarkdown && !hasMath && !hasCode && !hasChart && !hasMarp}
+	{:else if hasMermaid && !hasMarkdown && !hasMath && !hasCode && !hasChart && !hasMarp && !hasTable}
 		<!-- Pure mermaid content -->
 		<MermaidRenderer {content} />
-	{:else if hasCode && !hasMarkdown && !hasMath && !hasMermaid && !hasChart && !hasMarp}
+	{:else if hasCode && !hasMarkdown && !hasMath && !hasMermaid && !hasChart && !hasMarp && !hasTable}
 		<!-- Pure code content -->
 		<CodeRenderer {content} />
-	{:else if hasMath && !hasMarkdown && !hasCode && !hasMermaid && !hasChart && !hasMarp}
+	{:else if hasMath && !hasMarkdown && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTable}
 		<!-- Pure math content -->
 		<MathRenderer {content} />
-	{:else if hasMarkdown || hasMermaid || hasMath || hasCode || hasChart || hasMarp}
+	{:else if hasTable && !hasMath && !hasCode && !hasMermaid && !hasChart && !hasMarp}
+		<!-- Pure table content (allow with markdown for mixed content) -->
+		<TableRenderer {content} />
+	{:else if hasMarkdown || hasMermaid || hasMath || hasCode || hasChart || hasMarp || hasTable || hasPDF || hasTimeline || hasMedia || hasFile || hasUrlPreview}
 		<!-- Mixed content or markdown - let MarkdownRenderer handle everything -->
 		<MarkdownRenderer {content} />
 	{:else}
@@ -128,7 +144,34 @@
 	<!-- Debug info (remove in production) -->
 	{#if import.meta.env.DEV}
 		<div class="debug-info">
-			Mermaid: {hasMermaid}, Math: {hasMath}, Code: {hasCode}, Markdown: {hasMarkdown}, Image: {hasImage}, Chart: {hasChart}, Marp: {hasMarp}
+			<strong>Detection:</strong> 
+			{#if hasImage}🖼️ Image{/if}
+			{#if hasPDF}📄 PDF{/if}
+			{#if hasMedia}🎵 Media{/if}
+			{#if hasFile}📁 File{/if}
+			{#if hasUrlPreview}🔗 URL{/if}
+			{#if hasTimeline}⏰ Timeline{/if}
+			{#if hasTable}📊 Table{/if}
+			{#if hasChart}📈 Chart{/if}
+			{#if hasMermaid}🔀 Mermaid{/if}
+			{#if hasCode}💻 Code{/if}
+			{#if hasMath}🔢 Math{/if}
+			{#if hasMarp}🎤 Presentation{/if}
+			{#if hasMarkdown}📝 Markdown{/if}
+			{#if !hasImage && !hasPDF && !hasMedia && !hasFile && !hasUrlPreview && !hasTimeline && !hasTable && !hasChart && !hasMermaid && !hasCode && !hasMath && !hasMarp && !hasMarkdown}📄 Plain{/if}
+			<strong>→ Renderer:</strong>
+			{#if hasImage}ImageRenderer
+			{:else if hasPDF}PDFRenderer
+			{:else if hasMedia}MediaRenderer
+			{:else if hasFile}FileRenderer
+			{:else if hasUrlPreview}URLPreviewRenderer
+			{:else if hasTimeline}TimelineRenderer
+			{:else if hasChart && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasMarp && !hasTable}ChartRenderer
+			{:else if hasMermaid && !hasMarkdown && !hasMath && !hasCode && !hasChart && !hasMarp && !hasTable}MermaidRenderer  
+			{:else if hasCode && !hasMarkdown && !hasMath && !hasMermaid && !hasChart && !hasMarp && !hasTable}CodeRenderer
+			{:else if hasMath && !hasMarkdown && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTable}MathRenderer
+			{:else if hasTable && !hasMath && !hasCode && !hasMermaid && !hasChart && !hasMarp}TableRenderer
+			{:else}MarkdownRenderer{/if}
 		</div>
 	{/if}
 </div>
@@ -141,6 +184,11 @@
 		line-height: 1.5;
 		word-wrap: break-word;
 		overflow-wrap: break-word;
+	}
+
+	/* Make table renderers wider */
+	.message-renderer:has(.table-renderer) {
+		max-width: 95%;
 	}
 
 	.user-message {

@@ -45,8 +45,8 @@
 	// Chart type detection and parsing
 	function parseChartContent(text: string): { type: ChartType; data: any; options?: any } | null {
 		try {
-			// Remove markdown code block wrapper
-			const cleanText = text.replace(/```(?:chart|json)?\s*\n?|\n?```$/g, '').trim();
+			// Remove markdown code block wrapper (only chart blocks)
+			const cleanText = text.replace(/```chart\s*\n?|\n?```$/g, '').trim();
 			
 			// Try to parse as JSON first
 			let parsed: any;

@@ -24,6 +24,7 @@ main {
     display: flex;
     flex-direction: column;
     gap: 0.5rem;
+    overflow: hidden;
 }
 
 .new-chat-btn {
@@ -38,6 +39,34 @@ main {
     align-items: center;
     justify-content: center;
     gap: 8px;
+    flex-shrink: 0;
+}
+
+.chat-history {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    scrollbar-width: thin;
+    scrollbar-color: #565869 #202123;
+}
+
+.chat-history::-webkit-scrollbar {
+    width: 6px;
+}
+
+.chat-history::-webkit-scrollbar-track {
+    background: #202123;
+}
+
+.chat-history::-webkit-scrollbar-thumb {
+    background: #565869;
+    border-radius: 3px;
+}
+
+.chat-history::-webkit-scrollbar-thumb:hover {
+    background: #666;
 }
 
 .history-item {
@@ -46,13 +75,23 @@ main {
     color: #e5e5e5;
     cursor: pointer;
     border-radius: 6px;
-    overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 
 .history-item:hover {
     background-color: #343541;
+}
+
+.history-item.tba {
+    opacity: 0.6;
+    font-style: italic;
+    color: #a0a0a0;
+}
+
+.history-item.tba:hover {
+    background-color: #2a2b32;
+    opacity: 0.8;
 }
 
 .main-chat {

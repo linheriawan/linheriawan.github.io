@@ -37,15 +37,15 @@
 		}
 
 		// Special handling for Charts
-		if (lang === 'chart' || lang === 'json') {
+		if (lang === 'chart') {
 			const id = `chart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 			return `<div class="chart-container" data-chart-code="${encodeURIComponent(code)}" id="${id}"></div>`;
 		}
 
-		// Special handling for Marp presentations
+		// Special handling for Marp presentations - show as markdown with button
 		if (lang === 'marp') {
 			const id = `marp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-			return `<div class="marp-container" data-marp-code="${encodeURIComponent(code)}" id="${id}"></div>`;
+			return `<div class="marp-simple-container" data-marp-code="${encodeURIComponent(code)}" id="${id}"></div>`;
 		}
 		
 		// Syntax highlighting for code blocks
@@ -205,7 +205,7 @@
 
 			try {
 				// Parse chart data
-				const cleanCode = chartCode.replace(/```(?:chart|json)?\s*\n?|\n?```$/g, '').trim();
+				const cleanCode = chartCode.replace(/```chart\s*\n?|\n?```$/g, '').trim();
 				let chartConfig: any;
 				
 				try {
@@ -302,11 +302,11 @@
 		}
 	}
 
-	// Render Marp containers in the DOM
+	// Simple Marp containers - render as markdown with "Show as Marp" button
 	async function renderMarpContainers() {
 		if (!browser || !containerElement) return;
 
-		const marpContainers = containerElement.querySelectorAll('.marp-container');
+		const marpContainers = containerElement.querySelectorAll('.marp-simple-container');
 		
 		for (const container of marpContainers) {
 			const marpCode = decodeURIComponent(container.getAttribute('data-marp-code') || '');
@@ -314,41 +314,23 @@
 			if (!marpCode.trim()) continue;
 
 			try {
-				// Import Marp core dynamically
-				const { Marp } = await import('@marp-team/marp-core');
-				
-				const marp = new Marp({
-					html: true,
-					emoji: { shortcode: true, unicode: true }
-				});
-
-				// Clean the Marp code
+				// Clean the Marp code and remove directives for markdown display
 				let cleanCode = marpCode.replace(/```marp\s*\n?|\n?```$/g, '').trim();
+				cleanCode = cleanCode.replace(/^---[\s\S]*?---\s*/m, ''); // Remove frontmatter
 				
-				// Ensure it has Marp directives
-				if (!cleanCode.includes('---') && !cleanCode.startsWith('<!--')) {
-					cleanCode = `---\nmarp: true\ntheme: default\npaginate: true\n---\n\n${cleanCode}`;
-				}
-
-				const { html, css } = marp.render(cleanCode);
+				// Render as markdown
+				const markdownHtml = await renderMarkdown(cleanCode);
 				
-				// Count slides for navigation
-				const slideMatches = html.match(/<section[^>]*>/g);
-				const totalSlides = slideMatches ? slideMatches.length : 1;
-				
-				// Create presentation ID for this instance
-				const presentationId = `marp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-				
-				// Style the container with preview and controls
+				// Create simple container with markdown preview and button
 				container.innerHTML = `
-					<div class="marp-presentation-container" style="
+					<div class="marp-simple-preview" style="
 						border: 1px solid rgba(255, 255, 255, 0.2);
 						border-radius: 8px;
 						overflow: hidden;
-						background: #1a1a1a;
-						position: relative;
+						background: rgba(0, 0, 0, 0.1);
+						margin: 1rem 0;
 					">
-						<!-- Presentation Header -->
+						<!-- Header with Marp label and button -->
 						<div class="marp-header" style="
 							display: flex;
 							justify-content: space-between;
@@ -364,132 +346,40 @@
 								font-weight: 600;
 								font-size: 0.7rem;
 								letter-spacing: 0.5px;
-							">Marp Presentation (${totalSlides} slides)</span>
-							<div class="marp-actions" style="display: flex; gap: 0.3rem;">
-								<button onclick="openMarpPresentation('${presentationId}')" style="
-									background: none;
-									border: none;
-									color: #a0a0a0;
-									cursor: pointer;
-									padding: 0.3rem;
-									border-radius: 4px;
-									display: flex;
-									align-items: center;
-									justify-content: center;
-									transition: all 0.2s ease;
-								" title="Open in new tab" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.1)'; this.style.color='white'" onmouseout="this.style.backgroundColor=''; this.style.color='#a0a0a0'">
-									<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-										<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
-										<polyline points="15,3 21,3 21,9"/>
-										<line x1="10" y1="14" x2="21" y2="3"/>
-									</svg>
-								</button>
-								<button onclick="copyMarpSource('${presentationId}')" style="
-									background: none;
-									border: none;
-									color: #a0a0a0;
-									cursor: pointer;
-									padding: 0.3rem;
-									border-radius: 4px;
-									display: flex;
-									align-items: center;
-									justify-content: center;
-									transition: all 0.2s ease;
-								" title="Copy source" onmouseover="this.style.backgroundColor='rgba(255,255,255,0.1)'; this.style.color='white'" onmouseout="this.style.backgroundColor=''; this.style.color='#a0a0a0'">
-									<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-										<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-										<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-									</svg>
-								</button>
-							</div>
-						</div>
-						
-						<!-- Presentation Preview -->
-						<div class="marp-preview" style="
-							height: 300px;
-							overflow: hidden;
-							position: relative;
-							background: #1a1a1a;
-						">
-							<style>${css}
-								/* Override some Marp styles for preview */
-								section {
-									transform: scale(0.6);
-									transform-origin: top left;
-									width: 166.67%; /* 100% / 0.6 */
-									height: 166.67%;
-								}
-							</style>
-							${html}
-						</div>
-						
-						<!-- Slide Navigation -->
-						${totalSlides > 1 ? `
-						<div class="marp-nav" style="
-							display: flex;
-							justify-content: center;
-							align-items: center;
-							padding: 0.5rem;
-							background-color: rgba(0, 0, 0, 0.2);
-							border-top: 1px solid rgba(255, 255, 255, 0.1);
-							gap: 0.5rem;
-						">
-							<button onclick="prevMarpSlide('${presentationId}')" style="
-								background: rgba(255, 255, 255, 0.1);
+							">Marp Presentation</span>
+							<button onclick="openMarpPresentation('${container.id}')" style="
+								background: #0b69a3;
 								border: none;
 								color: white;
-								padding: 0.3rem;
-								border-radius: 4px;
 								cursor: pointer;
-								display: flex;
-								align-items: center;
-							">
-								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-									<polyline points="15,18 9,12 15,6"/>
-								</svg>
-							</button>
-							<span id="slide-counter-${presentationId}" style="color: #a0a0a0; font-size: 0.8rem; min-width: 50px; text-align: center;">1 / ${totalSlides}</span>
-							<button onclick="nextMarpSlide('${presentationId}')" style="
-								background: rgba(255, 255, 255, 0.1);
-								border: none;
-								color: white;
-								padding: 0.3rem;
+								padding: 0.5rem 1rem;
 								border-radius: 4px;
-								cursor: pointer;
-								display: flex;
-								align-items: center;
-							">
-								<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-									<polyline points="9,6 15,12 9,18"/>
-								</svg>
+								font-size: 0.8rem;
+								font-weight: 500;
+								transition: background 0.2s ease;
+							" title="Open presentation in fullscreen" onmouseover="this.style.backgroundColor='#085a8a'" onmouseout="this.style.backgroundColor='#0b69a3'">
+								📽️ Show as Marp
 							</button>
 						</div>
-						` : ''}
+						
+						<!-- Markdown Preview -->
+						<div class="marp-markdown-preview" style="
+							padding: 1rem;
+							max-height: 200px;
+							overflow-y: auto;
+						">
+							${markdownHtml}
+						</div>
 					</div>
 				`;
 				
-				// Store the source code for later use
-				container.setAttribute('data-marp-source', encodeURIComponent(cleanCode));
-				container.setAttribute('data-presentation-id', presentationId);
-				
-				// Setup slide navigation for preview
-				setTimeout(() => {
-					// @ts-ignore
-					if (window.setupMarpNavigation) {
-						// @ts-ignore
-						window.setupMarpNavigation(presentationId, totalSlides);
-					}
-				}, 100);
-				
-				container.style.padding = '1rem';
-				container.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
-				container.style.borderRadius = '8px';
-				container.style.margin = '1rem 0';
+				// Store the original source code for the button
+				container.setAttribute('data-marp-source', encodeURIComponent(marpCode));
 				
 			} catch (error) {
-				console.error('Marp rendering error:', error);
+				console.error('Marp preview error:', error);
 				container.innerHTML = `<div style="color: #ff7b72; padding: 1rem; background: rgba(255,123,114,0.1); border-radius: 6px;">
-					<strong>Marp Error:</strong> ${error.message}<br>
+					<strong>Marp Preview Error:</strong> ${error.message}<br>
 					<pre style="margin: 0.5rem 0; font-size: 0.8rem;">${marpCode}</pre>
 				</div>`;
 			}
@@ -552,86 +442,26 @@
 		}
 	}
 
-	// Setup global functions for Marp navigation
+	// Simple global function for opening Marp presentations
 	function setupGlobalMarpFunctions() {
 		if (!browser) return;
 
 		// @ts-ignore
-		window.setupMarpNavigation = (presentationId: string, totalSlides: number) => {
-			let currentSlide = 0;
-			
-			// @ts-ignore
-			window[`nextMarpSlide_${presentationId}`] = () => {
-				if (currentSlide < totalSlides - 1) {
-					currentSlide++;
-					updateSlideDisplay(presentationId, currentSlide, totalSlides);
-				}
-			};
-			
-			// @ts-ignore
-			window[`prevMarpSlide_${presentationId}`] = () => {
-				if (currentSlide > 0) {
-					currentSlide--;
-					updateSlideDisplay(presentationId, currentSlide, totalSlides);
-				}
-			};
-			
-			// Initialize display
-			updateSlideDisplay(presentationId, currentSlide, totalSlides);
-		};
-
-		// @ts-ignore
-		window.nextMarpSlide = (id: string) => {
-			// @ts-ignore
-			const func = window[`nextMarpSlide_${id}`];
-			if (func) func();
-		};
-
-		// @ts-ignore
-		window.prevMarpSlide = (id: string) => {
-			// @ts-ignore
-			const func = window[`prevMarpSlide_${id}`];
-			if (func) func();
-		};
-
-		// @ts-ignore
-		window.copyMarpSource = (presentationId: string) => {
-			const container = document.querySelector(`[data-presentation-id="${presentationId}"]`);
-			if (container) {
-				const source = decodeURIComponent(container.getAttribute('data-marp-source') || '');
-				navigator.clipboard.writeText(source).catch(console.error);
-			}
-		};
-
-		// @ts-ignore
-		window.openMarpPresentation = (presentationId: string) => {
-			const container = document.querySelector(`[data-presentation-id="${presentationId}"]`);
+		window.openMarpPresentation = (containerId: string) => {
+			const container = document.getElementById(containerId);
 			if (!container) return;
 			
 			const source = decodeURIComponent(container.getAttribute('data-marp-source') || '');
+			if (!source) return;
 			
-			// Encode the source as base64 for URL parameter
-			const encodedSource = btoa(encodeURIComponent(source));
+			// Store source in session storage instead of URL
+			const presentationId = `marp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+			sessionStorage.setItem(presentationId, source);
 			
-			// Open presentation in new tab using the dedicated route
-			const presentationUrl = `/presentation?source=${encodedSource}`;
+			// Open presentation with just the ID
+			const presentationUrl = `/presentation?id=${presentationId}`;
 			window.open(presentationUrl, '_blank');
 		};
-
-		function updateSlideDisplay(presentationId: string, currentSlide: number, totalSlides: number) {
-			const container = document.querySelector(`[data-presentation-id="${presentationId}"]`);
-			if (!container) return;
-			
-			const sections = container.querySelectorAll('section');
-			sections.forEach((section, index) => {
-				(section as HTMLElement).style.display = index === currentSlide ? 'block' : 'none';
-			});
-			
-			const counter = document.getElementById(`slide-counter-${presentationId}`);
-			if (counter) {
-				counter.textContent = `${currentSlide + 1} / ${totalSlides}`;
-			}
-		}
 	}
 
 	onMount(() => {

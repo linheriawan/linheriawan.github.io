@@ -11,7 +11,6 @@
 	let containerElement: HTMLDivElement;
 	let isLoading = $state<boolean>(true);
 	let hasError = $state<boolean>(false);
-	let isZoomed = $state<boolean>(false);
 	let imageInfo = $state<{
 		width?: number;
 		height?: number;
@@ -19,15 +18,26 @@
 		type?: string;
 	}>({});
 
+	// PhotoSwipe instance
+	let photoSwipe: any = null;
+	let isZoomed = $state<boolean>(false);
+
 	function extractImageUrl(text: string): string {
+		// Extract from ```image code blocks
+		const codeBlockMatch = text.match(/```image\s*([\s\S]*?)\s*```/i);
+		if (codeBlockMatch) {
+			return codeBlockMatch[1].trim();
+		}
+
+		const trimmed = text.trim();
 		// Direct URL
-		if (/^https?:\/\/.*\.(jpg|jpeg|png|gif|webp|svg)$/i.test(text.trim())) {
-			return text.trim();
+		if (/^https?:\/\/.*\.(jpg|jpeg|png|gif|webp|svg)$/i.test(trimmed)) {
+			return trimmed;
 		}
 
 		// Data URL
-		if (/^data:image\//.test(text.trim())) {
-			return text.trim();
+		if (/^data:image\//.test(trimmed)) {
+			return trimmed;
 		}
 
 		// Markdown image format: ![alt](url)
@@ -107,14 +117,62 @@
 		console.error('Failed to load image:', extractImageUrl(content));
 	}
 
-	function toggleZoom() {
-		isZoomed = !isZoomed;
+	async function openPhotoSwipe() {
+		if (!browser || !imageElement) return;
+
+		try {
+			// Dynamic import PhotoSwipe v5
+			const { default: PhotoSwipe } = await import('photoswipe');
+
+			const items = [{
+				src: extractImageUrl(content),
+				width: imageInfo.width || 1200,
+				height: imageInfo.height || 800,
+				alt: `${imageInfo.type || 'Image'} • ${imageInfo.width || '?'} × ${imageInfo.height || '?'}${imageInfo.size ? ` • ${imageInfo.size}` : ''}`
+			}];
+
+			const options = {
+				dataSource: items,
+				index: 0,
+				bgOpacity: 0.9,
+				showHideAnimationDuration: 300,
+				zoom: true,
+				close: true,
+				counter: false,
+				arrowPrev: false,
+				arrowNext: false,
+				initialZoomLevel: 'fit',
+				secondaryZoomLevel: 1.5,
+				maxZoomLevel: 3
+			};
+
+			// Create PhotoSwipe instance (v5 style)
+			photoSwipe = new PhotoSwipe(options);
+			
+			// Add event listeners
+			photoSwipe.on('loadComplete', (e) => {
+				console.log('PhotoSwipe image loaded:', e.index);
+			});
+
+			photoSwipe.on('destroy', () => {
+				photoSwipe = null;
+			});
+
+			// Import and add CSS
+			await import('photoswipe/photoswipe.css');
+
+			photoSwipe.init();
+
+		} catch (error) {
+			console.error('Failed to load PhotoSwipe:', error);
+			// Fallback to simple zoom overlay
+			toggleSimpleZoom();
+		}
 	}
 
-	function handleKeydown(event: KeyboardEvent) {
-		if (event.key === 'Escape' && isZoomed) {
-			isZoomed = false;
-		}
+	function toggleSimpleZoom() {
+		// Fallback simple zoom for when PhotoSwipe fails
+		isZoomed = !isZoomed;
 	}
 
 	function downloadImage() {
@@ -137,9 +195,12 @@
 
 	onMount(() => {
 		if (browser) {
-			document.addEventListener('keydown', handleKeydown);
+			// Cleanup PhotoSwipe on unmount
 			return () => {
-				document.removeEventListener('keydown', handleKeydown);
+				if (photoSwipe) {
+					photoSwipe.destroy();
+					photoSwipe = null;
+				}
 			};
 		}
 	});
@@ -200,18 +261,14 @@
 				</button>
 				<button 
 					class="action-button" 
-					onclick={toggleZoom}
-					title="Toggle zoom"
+					onclick={openPhotoSwipe}
+					title="Open in gallery viewer"
 				>
 					<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 						<circle cx="11" cy="11" r="8"></circle>
 						<path d="m21 21-4.35-4.35"></path>
-						{#if isZoomed}
-							<line x1="8" y1="11" x2="14" y2="11"></line>
-						{:else}
-							<line x1="11" y1="8" x2="11" y2="14"></line>
-							<line x1="8" y1="11" x2="14" y2="11"></line>
-						{/if}
+						<line x1="11" y1="8" x2="11" y2="14"></line>
+						<line x1="8" y1="11" x2="14" y2="11"></line>
 					</svg>
 				</button>
 			</div>
@@ -234,7 +291,7 @@
 				class:zoomed={isZoomed}
 				onload={handleImageLoad}
 				onerror={handleImageError}
-				onclick={toggleZoom}
+				onclick={openPhotoSwipe}
 			/>
 		</div>
 	{/if}

@@ -20,6 +20,23 @@
 			return { language, code };
 		}
 
+		// Auto-detect JSON
+		const trimmed = text.trim();
+		if ((trimmed.startsWith('{') && trimmed.endsWith('}')) || 
+		    (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+			try {
+				JSON.parse(trimmed);
+				return { language: 'json', code: trimmed };
+			} catch {
+				// Not valid JSON, continue
+			}
+		}
+
+		// Auto-detect XML
+		if (trimmed.startsWith('<') && trimmed.endsWith('>')) {
+			return { language: 'xml', code: trimmed };
+		}
+
 		// Fallback to treating entire content as code
 		return { language: 'text', code: text.trim() };
 	}
