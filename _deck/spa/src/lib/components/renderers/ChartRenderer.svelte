@@ -320,8 +320,8 @@
 
 <style>
 	.chart-renderer {
-		margin: 0.8rem 0;
-		border-radius: 8px;
+		margin: 0;
+		border-radius: 8px 8px 0 0;
 		overflow: hidden;
 		background-color: rgba(0, 0, 0, 0.2);
 		border: 1px solid rgba(255, 255, 255, 0.1);

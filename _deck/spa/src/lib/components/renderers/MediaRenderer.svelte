@@ -242,7 +242,7 @@
 		iframe.frameBorder = '0';
 		iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
 		iframe.allowFullscreen = true;
-		iframe.style.borderRadius = '8px';
+		iframe.style.borderRadius = '8px 8px 0 0';
 		
 		mediaContainer.appendChild(iframe);
 		isLoading = false;
@@ -348,7 +348,7 @@
 		console.log('Content:', content);
 		console.log('Already initialized:', initialized);
 		
-		if (browser && mediaContainer && content && !initialized) {
+		if (browser && mediaContainer && content && content.trim() && !initialized) {
 			console.log('All conditions met, initializing media player');
 			initialized = true;
 			initializePlayer();
@@ -361,7 +361,7 @@
 				player.dispose();
 				player = null;
 			}
-			initialized = true;
+			initialized = false; // Reset so it can initialize again if needed
 		};
 	});
 </script>

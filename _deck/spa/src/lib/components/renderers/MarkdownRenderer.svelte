@@ -30,25 +30,72 @@
 	renderer.code = function(code: string, language?: string) {
 		const lang = (language || 'text').toLowerCase();
 		
+		// Helper function to create renderer note
+		function createRendererNote(rendererName: string): string {
+			return `<div class="renderer-note">🔧 ${rendererName}</div>`;
+		}
+		
 		// Special handling for Mermaid diagrams
 		if (lang === 'mermaid') {
 			const id = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-			return `<div class="mermaid-container" data-mermaid-code="${encodeURIComponent(code)}" id="${id}"></div>`;
+			return `<div class="renderer-wrapper"><div class="mermaid-container" data-mermaid-code="${encodeURIComponent(code)}" id="${id}"></div>${createRendererNote('MermaidRenderer')}</div>`;
 		}
 
 		// Special handling for Charts
 		if (lang === 'chart') {
 			const id = `chart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-			return `<div class="chart-container" data-chart-code="${encodeURIComponent(code)}" id="${id}"></div>`;
+			return `<div class="renderer-wrapper"><div class="chart-container" data-chart-code="${encodeURIComponent(code)}" id="${id}"></div>${createRendererNote('ChartRenderer')}</div>`;
 		}
 
 		// Special handling for Marp presentations - show as markdown with button
 		if (lang === 'marp') {
 			const id = `marp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-			return `<div class="marp-simple-container" data-marp-code="${encodeURIComponent(code)}" id="${id}"></div>`;
+			return `<div class="renderer-wrapper"><div class="marp-simple-container" data-marp-code="${encodeURIComponent(code)}" id="${id}"></div>${createRendererNote('MarpRenderer (Presentation)')}</div>`;
+		}
+
+		// Special handling for Media (audio/video)
+		if (lang === 'audio' || lang === 'video') {
+			const id = `media-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+			return `<div class="renderer-wrapper"><div class="media-container" data-media-code="${encodeURIComponent(code)}" data-media-type="${lang}" id="${id}"></div>${createRendererNote('MediaRenderer (' + lang.charAt(0).toUpperCase() + lang.slice(1) + ')')}</div>`;
+		}
+
+		// Special handling for Timeline
+		if (lang === 'timeline') {
+			const id = `timeline-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+			return `<div class="renderer-wrapper"><div class="timeline-container" data-timeline-code="${encodeURIComponent(code)}" id="${id}"></div>${createRendererNote('TimelineRenderer')}</div>`;
+		}
+
+		// Special handling for Tables
+		if (lang === 'table' || lang === 'csv') {
+			const id = `table-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+			return `<div class="renderer-wrapper"><div class="table-container" data-table-code="${encodeURIComponent(code)}" id="${id}"></div>${createRendererNote('TableRenderer')}</div>`;
+		}
+
+		// Special handling for Images
+		if (lang === 'image') {
+			const id = `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+			return `<div class="renderer-wrapper"><div class="image-container" data-image-code="${encodeURIComponent(code)}" id="${id}"></div>${createRendererNote('ImageRenderer')}</div>`;
+		}
+
+		// Special handling for PDF
+		if (lang === 'pdf') {
+			const id = `pdf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+			return `<div class="renderer-wrapper"><div class="pdf-container" data-pdf-code="${encodeURIComponent(code)}" id="${id}"></div>${createRendererNote('PDFRenderer')}</div>`;
+		}
+
+		// Special handling for Files
+		if (lang === 'file') {
+			const id = `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+			return `<div class="renderer-wrapper"><div class="file-container" data-file-code="${encodeURIComponent(code)}" id="${id}"></div>${createRendererNote('FileRenderer')}</div>`;
+		}
+
+		// Special handling for URL Preview
+		if (lang === 'url') {
+			const id = `url-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+			return `<div class="renderer-wrapper"><div class="url-container" data-url-code="${encodeURIComponent(code)}" id="${id}"></div>${createRendererNote('URLPreviewRenderer')}</div>`;
 		}
 		
-		// Syntax highlighting for code blocks
+		// Default: Syntax highlighting for code blocks (CodeRenderer)
 		let highlightedCode = code;
 		try {
 			if (lang && lang !== 'text' && hljs.getLanguage(lang)) {
@@ -61,7 +108,9 @@
 			highlightedCode = hljs.escapeHtml(code);
 		}
 		
-		return `<pre class="code-block"><code class="language-${lang}">${highlightedCode}</code></pre>`;
+		// Add renderer note for code blocks
+		const codeRendererNote = createRendererNote(`CodeRenderer (${lang || 'auto-detect'})`);
+		return `<div class="code-block-wrapper"><pre class="code-block"><code class="language-${lang}">${highlightedCode}</code></pre>${codeRendererNote}</div>`;
 	};
 
 	// Override inline code rendering
@@ -155,11 +204,11 @@
 		mermaidInitialized = true;
 	}
 
-	// Render mermaid diagrams in the DOM
+	// Render mermaid diagrams in the DOM - only when complete
 	async function renderMermaidDiagrams() {
 		if (!browser || !containerElement) return;
 
-		const mermaidContainers = containerElement.querySelectorAll('.mermaid-container');
+		const mermaidContainers = containerElement.querySelectorAll('.mermaid-container:not([data-processed])');
 		
 		for (const container of mermaidContainers) {
 			const mermaidCode = decodeURIComponent(container.getAttribute('data-mermaid-code') || '');
@@ -167,7 +216,20 @@
 
 			if (!mermaidCode.trim()) continue;
 
+			// Check if the mermaid code block is complete (avoid streaming issues)
+			const parentText = containerElement.textContent || '';
+			const codeBlockStart = parentText.indexOf('```mermaid');
+			const codeBlockEnd = parentText.indexOf('```', codeBlockStart + 10);
+			
+			// Only process if we have a complete code block
+			if (codeBlockStart === -1 || codeBlockEnd === -1) {
+				continue;
+			}
+
 			try {
+				// Mark as being processed
+				container.setAttribute('data-processed', 'true');
+				
 				// Generate unique ID for mermaid render to avoid conflicts
 				const renderID = 'mermaid-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 				const { svg } = await mermaid.render(renderID, mermaidCode);
@@ -180,8 +242,8 @@
 				container.style.textAlign = 'center';
 				container.style.padding = '1rem';
 				container.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
-				container.style.borderRadius = '8px';
-				container.style.margin = '1rem 0';
+				container.style.borderRadius = '8px 8px 0 0';
+				container.style.margin = '0';
 			} catch (error) {
 				console.error('Mermaid rendering error:', error);
 				container.innerHTML = `<div style="color: #ff7b72; padding: 1rem; background: rgba(255,123,114,0.1); border-radius: 6px;">
@@ -259,8 +321,8 @@
 				container.appendChild(canvas);
 				container.style.padding = '1rem';
 				container.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
-				container.style.borderRadius = '8px';
-				container.style.margin = '1rem 0';
+				container.style.borderRadius = '8px 8px 0 0';
+				container.style.margin = '0';
 
 				// Import Chart.js dynamically with all necessary components
 				const chartJS = await import('chart.js');
@@ -325,10 +387,10 @@
 				container.innerHTML = `
 					<div class="marp-simple-preview" style="
 						border: 1px solid rgba(255, 255, 255, 0.2);
-						border-radius: 8px;
+						border-radius: 8px 8px 0 0;
 						overflow: hidden;
 						background: rgba(0, 0, 0, 0.1);
-						margin: 1rem 0;
+						margin: 0;
 					">
 						<!-- Header with Marp label and button -->
 						<div class="marp-header" style="
@@ -386,6 +448,337 @@
 		}
 	}
 
+	// Import renderer components dynamically
+	async function importRendererComponents() {
+		if (browser) {
+			const [
+				{ default: MediaRenderer },
+				{ default: TimelineRenderer },
+				{ default: TableRenderer },
+				{ default: ImageRenderer },
+				{ default: PDFRenderer },
+				{ default: FileRenderer },
+				{ default: URLPreviewRenderer }
+			] = await Promise.all([
+				import('./MediaRenderer.svelte'),
+				import('./TimelineRenderer.svelte'),
+				import('./TableRenderer.svelte'),
+				import('./ImageRenderer.svelte'),
+				import('./PDFRenderer.svelte'),
+				import('./FileRenderer.svelte'),
+				import('./URLPreviewRenderer.svelte')
+			]);
+			
+			return {
+				MediaRenderer,
+				TimelineRenderer,
+				TableRenderer,
+				ImageRenderer,
+				PDFRenderer,
+				FileRenderer,
+				URLPreviewRenderer
+			};
+		}
+		return null;
+	}
+
+	// Check if a code block is complete during streaming
+	function isCodeBlockComplete(containerElement: Element, blockType: string): boolean {
+		const parentText = containerElement.textContent || '';
+		const blockStart = parentText.indexOf(`\`\`\`${blockType}`);
+		const blockEnd = parentText.indexOf('```', blockStart + blockType.length + 3);
+		return blockStart !== -1 && blockEnd !== -1;
+	}
+
+	// Render media containers (audio/video) in the DOM - only when complete
+	async function renderMediaContainers() {
+		if (!browser || !containerElement) return;
+
+		const mediaContainers = containerElement.querySelectorAll('.media-container:not([data-processed])');
+		
+		if (mediaContainers.length === 0) return;
+		
+		try {
+			const components = await importRendererComponents();
+			if (!components) return;
+			
+			for (const container of mediaContainers) {
+				const mediaCode = decodeURIComponent(container.getAttribute('data-media-code') || '');
+				const mediaType = container.getAttribute('data-media-type') || '';
+				
+				if (!mediaCode.trim()) continue;
+
+				// Only process complete code blocks
+				if (!isCodeBlockComplete(containerElement, mediaType)) {
+					continue;
+				}
+				
+				// Mark as processed
+				container.setAttribute('data-processed', 'true');
+				
+				// Create Svelte component instance using Svelte 5 mount
+				const { mount: mountMedia } = await import('svelte');
+				mountMedia(components.MediaRenderer, {
+					target: container,
+					props: {
+						content: `\`\`\`${mediaType}\n${mediaCode}\n\`\`\``
+					}
+				});
+				
+				container.removeAttribute('data-media-code');
+			}
+		} catch (error) {
+			console.error('Media rendering error:', error);
+		}
+	}
+
+	// Render timeline containers in the DOM - only when complete
+	async function renderTimelineContainers() {
+		if (!browser || !containerElement) return;
+
+		const timelineContainers = containerElement.querySelectorAll('.timeline-container:not([data-processed])');
+		
+		if (timelineContainers.length === 0) return;
+		
+		try {
+			const components = await importRendererComponents();
+			if (!components) return;
+			
+			for (const container of timelineContainers) {
+				const timelineCode = decodeURIComponent(container.getAttribute('data-timeline-code') || '');
+				
+				if (!timelineCode.trim()) continue;
+
+				// Debug: Check if timeline code is available
+				console.log('Processing timeline with code:', timelineCode.substring(0, 50) + '...');
+				
+				// Re-enabled timeline processing with improved initialization logic
+				console.log('Timeline processing enabled - testing improved initialization');
+				
+				// Mark as processed
+				container.setAttribute('data-processed', 'true');
+				
+				// Create Svelte component instance using Svelte 5 mount
+				const { mount } = await import('svelte');
+				mount(components.TimelineRenderer, {
+					target: container,
+					props: {
+						content: `\`\`\`timeline\n${timelineCode}\n\`\`\``
+					}
+				});
+				
+				container.removeAttribute('data-timeline-code');
+			}
+		} catch (error) {
+			console.error('Timeline rendering error:', error);
+		}
+	}
+
+	// Render table containers in the DOM - only when complete
+	async function renderTableContainers() {
+		if (!browser || !containerElement) return;
+
+		const tableContainers = containerElement.querySelectorAll('.table-container:not([data-processed])');
+		
+		if (tableContainers.length === 0) return;
+		
+		try {
+			const components = await importRendererComponents();
+			if (!components) return;
+			
+			for (const container of tableContainers) {
+				const tableCode = decodeURIComponent(container.getAttribute('data-table-code') || '');
+				
+				if (!tableCode.trim()) continue;
+
+				// Only process complete code blocks
+				if (!isCodeBlockComplete(containerElement, 'table') && !isCodeBlockComplete(containerElement, 'csv')) {
+					continue;
+				}
+				
+				// Mark as processed
+				container.setAttribute('data-processed', 'true');
+				
+				// Create Svelte component instance using Svelte 5 mount
+				const { mount: mountTable } = await import('svelte');
+				mountTable(components.TableRenderer, {
+					target: container,
+					props: {
+						content: `\`\`\`csv\n${tableCode}\n\`\`\``
+					}
+				});
+				
+				container.removeAttribute('data-table-code');
+			}
+		} catch (error) {
+			console.error('Table rendering error:', error);
+		}
+	}
+
+	// Render image containers in the DOM - only when complete
+	async function renderImageContainers() {
+		if (!browser || !containerElement) return;
+
+		const imageContainers = containerElement.querySelectorAll('.image-container:not([data-processed])');
+		
+		if (imageContainers.length === 0) return;
+		
+		try {
+			const components = await importRendererComponents();
+			if (!components) return;
+			
+			for (const container of imageContainers) {
+				const imageCode = decodeURIComponent(container.getAttribute('data-image-code') || '');
+				
+				if (!imageCode.trim()) continue;
+
+				// Only process complete code blocks
+				if (!isCodeBlockComplete(containerElement, 'image')) {
+					continue;
+				}
+				
+				// Mark as processed
+				container.setAttribute('data-processed', 'true');
+				
+				// Create Svelte component instance using Svelte 5 mount
+				const { mount: mountImage } = await import('svelte');
+				mountImage(components.ImageRenderer, {
+					target: container,
+					props: {
+						content: `\`\`\`image\n${imageCode}\n\`\`\``
+					}
+				});
+				
+				container.removeAttribute('data-image-code');
+			}
+		} catch (error) {
+			console.error('Image rendering error:', error);
+		}
+	}
+
+	// Render PDF containers in the DOM - only when complete
+	async function renderPDFContainers() {
+		if (!browser || !containerElement) return;
+
+		const pdfContainers = containerElement.querySelectorAll('.pdf-container:not([data-processed])');
+		
+		if (pdfContainers.length === 0) return;
+		
+		try {
+			const components = await importRendererComponents();
+			if (!components) return;
+			
+			for (const container of pdfContainers) {
+				const pdfCode = decodeURIComponent(container.getAttribute('data-pdf-code') || '');
+				
+				if (!pdfCode.trim()) continue;
+
+				// Only process complete code blocks
+				if (!isCodeBlockComplete(containerElement, 'pdf')) {
+					continue;
+				}
+				
+				// Mark as processed
+				container.setAttribute('data-processed', 'true');
+				
+				// Create Svelte component instance using Svelte 5 mount
+				const { mount: mountPDF } = await import('svelte');
+				mountPDF(components.PDFRenderer, {
+					target: container,
+					props: {
+						content: `\`\`\`pdf\n${pdfCode}\n\`\`\``
+					}
+				});
+				
+				container.removeAttribute('data-pdf-code');
+			}
+		} catch (error) {
+			console.error('PDF rendering error:', error);
+		}
+	}
+
+	// Render file containers in the DOM - only when complete
+	async function renderFileContainers() {
+		if (!browser || !containerElement) return;
+
+		const fileContainers = containerElement.querySelectorAll('.file-container:not([data-processed])');
+		
+		if (fileContainers.length === 0) return;
+		
+		try {
+			const components = await importRendererComponents();
+			if (!components) return;
+			
+			for (const container of fileContainers) {
+				const fileCode = decodeURIComponent(container.getAttribute('data-file-code') || '');
+				
+				if (!fileCode.trim()) continue;
+
+				// Only process complete code blocks
+				if (!isCodeBlockComplete(containerElement, 'file')) {
+					continue;
+				}
+				
+				// Mark as processed
+				container.setAttribute('data-processed', 'true');
+				
+				// Create Svelte component instance using Svelte 5 mount
+				const { mount: mountFile } = await import('svelte');
+				mountFile(components.FileRenderer, {
+					target: container,
+					props: {
+						content: `\`\`\`file\n${fileCode}\n\`\`\``
+					}
+				});
+				
+				container.removeAttribute('data-file-code');
+			}
+		} catch (error) {
+			console.error('File rendering error:', error);
+		}
+	}
+
+	// Render URL containers in the DOM - only when complete
+	async function renderURLContainers() {
+		if (!browser || !containerElement) return;
+
+		const urlContainers = containerElement.querySelectorAll('.url-container:not([data-processed])');
+		
+		if (urlContainers.length === 0) return;
+		
+		try {
+			const components = await importRendererComponents();
+			if (!components) return;
+			
+			for (const container of urlContainers) {
+				const urlCode = decodeURIComponent(container.getAttribute('data-url-code') || '');
+				
+				if (!urlCode.trim()) continue;
+
+				// Only process complete code blocks
+				if (!isCodeBlockComplete(containerElement, 'url')) {
+					continue;
+				}
+				
+				// Mark as processed
+				container.setAttribute('data-processed', 'true');
+				
+				// Create Svelte component instance using Svelte 5 mount
+				const { mount: mountURL } = await import('svelte');
+				mountURL(components.URLPreviewRenderer, {
+					target: container,
+					props: {
+						content: `\`\`\`url\n${urlCode}\n\`\`\``
+					}
+				});
+				
+				container.removeAttribute('data-url-code');
+			}
+		} catch (error) {
+			console.error('URL rendering error:', error);
+		}
+	}
+
 	async function renderMarkdown(text: string): Promise<string> {
 		try {
 			// First, process math formulas
@@ -435,6 +828,13 @@
 			await renderMermaidDiagrams();
 			await renderChartContainers();
 			await renderMarpContainers();
+			await renderMediaContainers();
+			await renderTimelineContainers();
+			await renderTableContainers();
+			await renderImageContainers();
+			await renderPDFContainers();
+			await renderFileContainers();
+			await renderURLContainers();
 		} catch (error) {
 			console.error('Render error:', error);
 		} finally {
@@ -638,10 +1038,10 @@
 
 	/* Mermaid container styling */
 	:global(.markdown-renderer .mermaid-container) {
-		margin: 1rem 0;
+		margin: 0;
 		padding: 1rem;
 		background-color: rgba(0, 0, 0, 0.1);
-		border-radius: 8px;
+		border-radius: 8px 8px 0 0;
 		text-align: center;
 		min-height: 100px;
 		display: flex;
@@ -658,5 +1058,31 @@
 	:global(.markdown-renderer .katex) {
 		color: #ffffff;
 		font-size: 1.1em;
+	}
+
+	/* Wrapper styles for consistent layout */
+	:global(.markdown-renderer .renderer-wrapper),
+	:global(.markdown-renderer .code-block-wrapper) {
+		position: relative;
+		margin: 0.5rem 0;
+	}
+
+	/* Renderer notes styling - positioned at bottom with no gap */
+	:global(.markdown-renderer .renderer-note) {
+		font-size: 0.7rem;
+		color: #888;
+		background-color: rgba(0, 0, 0, 0.3);
+		padding: 0 0.5rem;
+		border-radius: 0 0 4px 4px;
+		margin: 0;
+		border-top: 1px solid #0b69a3;
+		font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+		display: block;
+	}
+
+	/* Ensure pre tags have no bottom margin when in wrapper */
+	:global(.markdown-renderer .code-block-wrapper pre) {
+		margin-bottom: 0 !important;
+		border-radius: 6px 6px 0 0;
 	}
 </style>

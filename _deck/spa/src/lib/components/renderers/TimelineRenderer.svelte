@@ -32,7 +32,7 @@
 	// Parse timeline content from various formats
 	function parseTimelineContent(text: string) {
 		const content = extractContent(text);
-		console.log('Raw timeline input:', text);
+		console.log('Raw timeline input:', text.substring(0, 100) + '...');
 		console.log('Extracted timeline content:', content);
 		
 		try {
@@ -214,13 +214,20 @@
 			// Clean up any existing content
 			if (timelineContainer) {
 				timelineContainer.innerHTML = '';
+				console.log('Timeline container dimensions:', {
+					width: timelineContainer.offsetWidth,
+					height: timelineContainer.offsetHeight,
+					clientWidth: timelineContainer.clientWidth,
+					clientHeight: timelineContainer.clientHeight
+				});
 			}
 			
 			// Parse the content or use sample data
 			if (content && content.trim()) {
-				console.log('Raw timeline content:', content);
+				console.log('Timeline: parsing content, length:', content.length);
 				timelineData = parseTimelineContent(content);
 			} else {
+				console.log('Timeline: no content provided, using sample data');
 				timelineData = generateSampleData();
 			}
 
@@ -231,25 +238,32 @@
 				throw new Error('No timeline items found');
 			}
 
-			// Add timeout to prevent indefinite loading
+			// Add timeout to prevent indefinite loading - reduced to 5 seconds
 			const timeoutPromise = new Promise((_, reject) => {
-				setTimeout(() => reject(new Error('Timeline loading timeout')), 10000);
+				setTimeout(() => {
+					console.log('TIMELINE TIMEOUT - initialization taking too long');
+					reject(new Error('Timeline loading timeout (5s)'));
+				}, 5000);
 			});
 
 			const loadPromise = async () => {
 				// Dynamic import vis-timeline
-				console.log('Importing vis-timeline...');
+				console.log('Step 1: Importing vis-timeline...');
 				const { Timeline, DataSet } = await import('vis-timeline/standalone');
-				console.log('vis-timeline imported successfully:', { Timeline, DataSet });
+				console.log('Step 2: vis-timeline imported successfully:', { Timeline, DataSet });
 
 				// Import CSS
-				console.log('Importing vis-timeline CSS...');
+				console.log('Step 3: Importing vis-timeline CSS...');
 				await import('vis-timeline/styles/vis-timeline-graph2d.min.css');
-				console.log('CSS imported successfully');
+				console.log('Step 4: CSS imported successfully');
 
 				// Create datasets
+				console.log('Step 5: Creating datasets...');
+				console.log('Timeline items to process:', timelineData.items);
 				const items = new DataSet(timelineData.items);
+				console.log('Step 6: Items dataset created:', items);
 				const groups = timelineData.groups ? new DataSet(timelineData.groups) : undefined;
+				console.log('Step 7: Groups dataset created:', groups);
 
 				// Timeline options
 				const options = {
@@ -302,9 +316,16 @@
 				console.log('Groups dataset:', groups);
 				console.log('Timeline options:', options);
 				
-				timeline = new Timeline(timelineContainer, items, groups, options);
-				console.log('Timeline created successfully:', timeline);
+				console.log('Step 8: Creating timeline instance...');
+				try {
+					timeline = new Timeline(timelineContainer, items, groups, options);
+					console.log('Step 9: Timeline created successfully:', timeline);
+				} catch (timelineError) {
+					console.error('Failed to create timeline:', timelineError);
+					throw timelineError;
+				}
 
+				console.log('Step 10: Adding event listeners...');
 				// Add event listeners
 				timeline.on('select', (properties: any) => {
 					if (properties.items.length > 0) {
@@ -316,9 +337,10 @@
 					}
 				});
 
+				console.log('Step 11: Fitting timeline...');
 				// Fit timeline to show all items
 				timeline.fit();
-				console.log('Timeline fit and ready');
+				console.log('Step 12: Timeline fit and ready - INITIALIZATION COMPLETE');
 			};
 
 			// Race between loading and timeout
@@ -328,6 +350,8 @@
 			console.error('Timeline initialization error:', error);
 			hasError = true;
 			errorMessage = error.message || 'Failed to initialize timeline';
+			initialized = false; // Reset so it can be retried
+			throw error; // Re-throw for the effect's catch handler
 		} finally {
 			isLoading = false;
 		}
@@ -360,26 +384,31 @@
 
 	// Use effect to initialize when container is available
 	$effect(() => {
-		console.log('Timeline effect triggered');
-		console.log('Browser available:', browser);
-		console.log('Timeline container:', timelineContainer);
-		console.log('Content:', content);
-		console.log('Already initialized:', initialized);
+		console.log('Timeline effect triggered, content length:', content?.length || 0);
+		console.log('Already initialized:', initialized, 'Timeline exists:', !!timeline);
 		
-		if (browser && timelineContainer && content && !initialized) {
-			console.log('All conditions met, initializing timeline');
-			initialized = true;
-			initializeTimeline();
+		// Only initialize if we have all required conditions and haven't initialized yet
+		if (browser && timelineContainer && content && content.trim() && !initialized && !timeline) {
+			console.log('All conditions met, starting timeline initialization');
+			initialized = true; // Set immediately to prevent race conditions
+			initializeTimeline().catch(error => {
+				console.error('Timeline initialization failed:', error);
+				initialized = false; // Reset on error so it can be retried
+			});
 		}
 		
 		// Cleanup on component destroy
 		return () => {
-			console.log('Timeline cleanup');
+			console.log('Timeline cleanup - destroying timeline');
 			if (timeline) {
-				timeline.destroy();
+				try {
+					timeline.destroy();
+				} catch (e) {
+					console.warn('Error destroying timeline:', e);
+				}
 				timeline = null;
 			}
-			initialized = true;
+			// Don't reset initialized here - let it stay true if successfully initialized
 		};
 	});
 </script>
@@ -487,8 +516,8 @@
 
 <style>
 	.timeline-renderer {
-		margin: 0.8rem 0;
-		border-radius: 8px;
+		margin: 0;
+		border-radius: 8px 8px 0 0;
 		overflow: hidden;
 		background-color: rgba(0, 0, 0, 0.2);
 		border: 1px solid rgba(255, 255, 255, 0.1);

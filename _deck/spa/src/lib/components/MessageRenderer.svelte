@@ -104,74 +104,46 @@
 </script>
 
 <div class="message-renderer" class:user-message={sender === 'user'} class:ai-message={sender === 'ai'}>
-	{#if hasImage}
+	{#if hasImage && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTable && !hasTimeline && !hasMedia && !hasFile && !hasUrlPreview && !hasPDF}
+		<!-- Pure image content only -->
 		<ImageRenderer {content} />
-	{:else if hasPDF}
+	{:else if hasPDF && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTable && !hasTimeline && !hasMedia && !hasFile && !hasUrlPreview && !hasImage}
+		<!-- Pure PDF content only -->
 		<PDFRenderer {content} />
-	{:else if hasMedia}
+	{:else if hasMedia && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTable && !hasTimeline && !hasFile && !hasUrlPreview && !hasImage && !hasPDF}
+		<!-- Pure media content only -->
 		<MediaRenderer {content} />
-	{:else if hasFile}
+	{:else if hasFile && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTable && !hasTimeline && !hasMedia && !hasUrlPreview && !hasImage && !hasPDF}
+		<!-- Pure file content only -->
 		<FileRenderer {content} />
-	{:else if hasUrlPreview}
+	{:else if hasUrlPreview && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTable && !hasTimeline && !hasMedia && !hasFile && !hasImage && !hasPDF}
+		<!-- Pure URL preview content only -->
 		<URLPreviewRenderer {content} />
-	{:else if hasTimeline}
+	{:else if hasTimeline && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTable && !hasMedia && !hasFile && !hasUrlPreview && !hasImage && !hasPDF}
+		<!-- Pure timeline content only -->
 		<TimelineRenderer {content} />
-	{:else if hasChart && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasMarp && !hasTable}
-		<!-- Pure chart content -->
+	{:else if hasChart && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasMarp && !hasTable && !hasTimeline && !hasMedia && !hasFile && !hasUrlPreview && !hasImage && !hasPDF}
+		<!-- Pure chart content only -->
 		<ChartRenderer {content} />
-	{:else if hasMermaid && !hasMarkdown && !hasMath && !hasCode && !hasChart && !hasMarp && !hasTable}
-		<!-- Pure mermaid content -->
+	{:else if hasMermaid && !hasMarkdown && !hasMath && !hasCode && !hasChart && !hasMarp && !hasTable && !hasTimeline && !hasMedia && !hasFile && !hasUrlPreview && !hasImage && !hasPDF}
+		<!-- Pure mermaid content only -->
 		<MermaidRenderer {content} />
-	{:else if hasCode && !hasMarkdown && !hasMath && !hasMermaid && !hasChart && !hasMarp && !hasTable}
-		<!-- Pure code content -->
+	{:else if hasCode && !hasMarkdown && !hasMath && !hasMermaid && !hasChart && !hasMarp && !hasTable && !hasTimeline && !hasMedia && !hasFile && !hasUrlPreview && !hasImage && !hasPDF}
+		<!-- Pure code content only -->
 		<CodeRenderer {content} />
-	{:else if hasMath && !hasMarkdown && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTable}
-		<!-- Pure math content -->
+	{:else if hasMath && !hasMarkdown && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTable && !hasTimeline && !hasMedia && !hasFile && !hasUrlPreview && !hasImage && !hasPDF}
+		<!-- Pure math content only -->
 		<MathRenderer {content} />
-	{:else if hasTable && !hasMath && !hasCode && !hasMermaid && !hasChart && !hasMarp}
-		<!-- Pure table content (allow with markdown for mixed content) -->
+	{:else if hasTable && !hasMath && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTimeline && !hasMedia && !hasFile && !hasUrlPreview && !hasImage && !hasPDF}
+		<!-- Pure table content only (allow with markdown for mixed content) -->
 		<TableRenderer {content} />
-	{:else if hasMarkdown || hasMermaid || hasMath || hasCode || hasChart || hasMarp || hasTable || hasPDF || hasTimeline || hasMedia || hasFile || hasUrlPreview}
+	{:else if hasMarkdown || hasMermaid || hasMath || hasCode || hasChart || hasMarp || hasTable || hasPDF || hasTimeline || hasMedia || hasFile || hasUrlPreview || hasImage}
 		<!-- Mixed content or markdown - let MarkdownRenderer handle everything -->
 		<MarkdownRenderer {content} />
 	{:else}
 		<!-- Plain text fallback -->
 		<div class="text-content">
 			{processedContent}
-		</div>
-	{/if}
-	
-	<!-- Debug info (remove in production) -->
-	{#if import.meta.env.DEV}
-		<div class="debug-info">
-			<strong>Detection:</strong> 
-			{#if hasImage}🖼️ Image{/if}
-			{#if hasPDF}📄 PDF{/if}
-			{#if hasMedia}🎵 Media{/if}
-			{#if hasFile}📁 File{/if}
-			{#if hasUrlPreview}🔗 URL{/if}
-			{#if hasTimeline}⏰ Timeline{/if}
-			{#if hasTable}📊 Table{/if}
-			{#if hasChart}📈 Chart{/if}
-			{#if hasMermaid}🔀 Mermaid{/if}
-			{#if hasCode}💻 Code{/if}
-			{#if hasMath}🔢 Math{/if}
-			{#if hasMarp}🎤 Presentation{/if}
-			{#if hasMarkdown}📝 Markdown{/if}
-			{#if !hasImage && !hasPDF && !hasMedia && !hasFile && !hasUrlPreview && !hasTimeline && !hasTable && !hasChart && !hasMermaid && !hasCode && !hasMath && !hasMarp && !hasMarkdown}📄 Plain{/if}
-			<strong>→ Renderer:</strong>
-			{#if hasImage}ImageRenderer
-			{:else if hasPDF}PDFRenderer
-			{:else if hasMedia}MediaRenderer
-			{:else if hasFile}FileRenderer
-			{:else if hasUrlPreview}URLPreviewRenderer
-			{:else if hasTimeline}TimelineRenderer
-			{:else if hasChart && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasMarp && !hasTable}ChartRenderer
-			{:else if hasMermaid && !hasMarkdown && !hasMath && !hasCode && !hasChart && !hasMarp && !hasTable}MermaidRenderer  
-			{:else if hasCode && !hasMarkdown && !hasMath && !hasMermaid && !hasChart && !hasMarp && !hasTable}CodeRenderer
-			{:else if hasMath && !hasMarkdown && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTable}MathRenderer
-			{:else if hasTable && !hasMath && !hasCode && !hasMermaid && !hasChart && !hasMarp}TableRenderer
-			{:else}MarkdownRenderer{/if}
 		</div>
 	{/if}
 </div>
@@ -210,13 +182,6 @@
 		font-family: inherit;
 	}
 
-	.debug-info {
-		font-size: 0.7rem;
-		opacity: 0.6;
-		margin-top: 0.5rem;
-		padding-top: 0.5rem;
-		border-top: 1px solid rgba(255, 255, 255, 0.1);
-	}
 
 	/* Global styles for all renderers */
 	:global(.message-renderer .renderer-content) {
