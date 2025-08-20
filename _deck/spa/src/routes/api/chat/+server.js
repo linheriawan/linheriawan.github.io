@@ -7,10 +7,9 @@ import path from 'path';
 // Mock responses mapped by number
 const MOCK_RESPONSES = {
 	'1': 'resp_1.md',      // Mixed content
-	'2': 'resp_2_math.md', // Math formulas
-	'5': 'resp_5_presentations.md', // Presentations
-	'6': 'resp_6_pdfs.md', // PDF documents
-	'7': 'resp_7_files.md' // File downloads and URL previews
+	'2': 'resp_2.md', // Presentations, Math formulas
+	'3': 'resp_3.md', // PDF documents, File downloads and URL previews
+	'4': 'resp_4.md' // single renderer : table, with 2 data
 };
 
 async function getMockResponse(messageContent) {

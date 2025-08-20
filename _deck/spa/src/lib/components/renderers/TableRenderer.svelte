@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 
 	interface Props {
@@ -200,6 +201,8 @@
 
 			// Create native HTML table
 			createHtmlTable();
+			
+			console.log('✅ tablerenderer done rendering');
 
 		} catch (error: any) {
 			console.error('Table initialization error:', error);
@@ -220,7 +223,7 @@
 		].join('\n');
 
 		navigator.clipboard.writeText(csvContent).then(() => {
-			console.log('Table data copied to clipboard');
+			// Table data copied to clipboard
 		}).catch(err => {
 			console.error('Failed to copy table data:', err);
 		});
@@ -245,11 +248,17 @@
 		URL.revokeObjectURL(url);
 	}
 
-	// Use effect to initialize when container is available
-	$effect(() => {
-		if (browser && tableContainer && content && !initialized) {
-			initialized = true;
-			initializeTable();
+	// Use onMount to initialize when component is ready
+	onMount(() => {
+		if (browser) {
+			console.log('🚀 tablerenderer is initialize');
+			// Small delay to ensure DOM is ready
+			setTimeout(() => {
+				if (tableContainer && content && !initialized) {
+						initialized = true;
+					initializeTable();
+				}
+			}, 10);
 		}
 		
 		// Cleanup on component destroy

@@ -47,42 +47,58 @@ To closely mimic the real ai response we use src/mock/*.md file to illustrate ho
 - **Styling**: Tailwind CSS 4.x
 - **Deployment**: Static SPA build (adapter-static with fallback)
 
-### Key Components Structure
+### Key Components Structure - NEW ARCHITECTURE
 
-**Content Rendering System**: The application centers around a sophisticated content renderer that automatically detects and renders different content types:
+**Centralized Content Rendering System**: The application uses a **markdown-first approach** with embedded special renderers, all controlled by MessageRenderer.svelte:
 
 ```
 src/lib/components/
-├── MessageRenderer.svelte          # Main content detection and routing
+├── MessageRenderer.svelte          # MAIN PROCESSOR - handles ALL content detection, markdown processing, and renderer mounting
 └── renderers/
-    ├── MarkdownRenderer.svelte     # Markdown with mixed content support
-    ├── CodeRenderer.svelte         # Syntax highlighting
+    ├── TableRenderer.svelte        # Table/CSV data visualization
+    ├── ChartRenderer.svelte        # Chart.js data visualization
     ├── MermaidRenderer.svelte      # Diagrams and flowcharts
-    ├── MathRenderer.svelte         # LaTeX formulas
-    ├── ChartRenderer.svelte        # Data visualization
-    ├── MarpRenderer.svelte         # Presentation slides
-    └── ImageRenderer.svelte        # Image gallery with zoom
+    ├── TimelineRenderer.svelte     # Timeline visualization
+    ├── ImageRenderer.svelte        # Image gallery with zoom
+    ├── MediaRenderer.svelte        # Audio/video player
+    ├── PDFRenderer.svelte          # PDF document viewer
+    ├── FileRenderer.svelte         # File download links
+    ├── URLPreviewRenderer.svelte   # URL preview cards
+    ├── CodeRenderer.svelte         # Syntax highlighting (handled by MessageRenderer)
+    ├── MathRenderer.svelte         # LaTeX formulas (handled by MessageRenderer)
+    └── MarpRenderer.svelte         # Presentation slides (handled by MessageRenderer)
 ```
-**Renderer Usage Logic**:
-1. MarkdownRenderer :  Default renderer (fallback if no other renderer is match) for any text with pattern of ```[keyword]\n[data]```
-2. ChartRenderer : Rendering Chart diagram with pattern of ```chart\n[data]```
-3. CodeRenderer : Rendering programming code block, keyword should including: javascript, json, xml, python,typescript,etc
-3. FileRenderer : Rendering File if pattern is ```file\n[data]```
-4. ImageRenderer : Rendering image preview if pattern is ```image\n[data]```
-5. MathRenderer : Rendering Mermaid diagram with pattern of ```math\n[data]``` or `$$...$$`, `$...$`, or LaTeX commands, but need strategy of how to rendering inline or as block
-6. MediaRenderer : Rendering media player if pattern is ```audio\n[data]``` or ```video\n[data]```
-7. MermaidRenderer : Rendering Mermaid diagram with pattern of ```mermaid\n[data]```
-8. PdfRenderer : Rendering image preview if pattern is ```pdf\n[data]```
-9. TableRenderer : Rendering table if pattern is ```table\n[json_data]``` or ```csv\n[csv_data]```
-10. TimelineRenderer : Rendering timeline visualization if pattern is ```timeline\n[data]```
-11. URLPreviewRenderer : Rendering URL if pattern is ```url\n[data]```
-12. MarpRenderer : Rendering as Markdown (goes to markdownrenderer) if pattern is ```marp\n[data]``` (but have show marp button, which will open new window that really rendering marpit)
 
-**Content Detection Logic**: MessageRenderer.svelte contains sophisticated content analysis that:
-- Detects content types using regex patterns
-- Prioritizes content types (Marp > Charts > Mermaid > Code > Math)
-- Handles mixed content by routing to MarkdownRenderer
-- Falls back to plain text for unrecognized content
+**NEW RENDERER ARCHITECTURE**:
+- **MessageRenderer.svelte** is the SINGLE point of content processing
+- Uses `marked.js` with custom renderer to detect special code blocks
+- Processes content as markdown by default
+- Embeds special renderers dynamically using Svelte's `mount()` function
+- Each special renderer gets proper initialization and completion logging
+
+**Special Block Detection Patterns**:
+1. ```csv\n[data]``` → TableRenderer
+2. ```table\n[data]``` → TableRenderer  
+3. ```chart\n[data]``` → ChartRenderer
+4. ```mermaid\n[data]``` → MermaidRenderer
+5. ```timeline\n[data]``` → TimelineRenderer
+6. ```image\n[data]``` → ImageRenderer
+7. ```audio\n[data]``` or ```video\n[data]``` → MediaRenderer
+8. ```pdf\n[data]``` → PDFRenderer
+9. ```file\n[data]``` → FileRenderer
+10. ```url\n[data]``` → URLPreviewRenderer
+11. ```marp\n[data]``` → Stays as markdown with presentation button
+12. Programming languages (js, python, etc.) → Syntax highlighting (built into MessageRenderer)
+13. Math formulas `$$...$$` or `$...$` → KaTeX rendering (built into MessageRenderer)
+
+**Content Processing Flow**:
+1. MessageRenderer receives content
+2. Uses marked.js custom renderer to detect special code blocks
+3. Registers complete blocks in specialBlocks Map
+4. Processes as markdown with placeholders for special blocks
+5. Sanitizes HTML with DOMPurify
+6. Mounts appropriate renderer components to placeholders
+7. Each renderer logs initialization and completion
 
 ### Dependencies by Content Type
 
@@ -123,6 +139,35 @@ src/lib/components/
 - Debug information shown in development mode
 - Auto-scrolling chat interface
 - Responsive design with mobile support
+
+### Rendering Architecture Changes (Aug 2024)
+
+**PROBLEM SOLVED**: Previous architecture had complex dual detection system between MessageRenderer and MarkdownRenderer causing:
+- Multiple duplicate registrations during streaming
+- Table renderer showing "initialized" but never "done rendering"
+- Container timing issues preventing proper component mounting
+- Excessive deduplication logic that prevented proper renderer creation
+
+**NEW SOLUTION**: Centralized markdown-first architecture in MessageRenderer.svelte:
+- **Single responsibility**: MessageRenderer handles ALL content detection and processing
+- **Markdown-first**: Content processed as markdown by default with embedded special renderers
+- **Direct mounting**: Special renderers mounted directly using Svelte's mount() function
+- **Simplified flow**: No complex registry systems or dual detection
+- **Proper logging**: Each renderer shows both initialization and completion logs
+
+**Key Implementation Details**:
+- MarkdownRenderer.svelte is now **UNUSED** - all functionality moved to MessageRenderer
+- All renderer components imported directly in MessageRenderer
+- specialBlocks Map tracks components that need special rendering
+- Custom marked.js renderer detects special code blocks during markdown processing
+- Components mounted with 10ms timeout to ensure DOM is ready
+- Each renderer gets formatted content: `\`\`\`type\ndata\n\`\`\``
+
+**Demo Commands for Testing**:
+- Send "1" - Mixed content with 11 different renderers
+- Send "2" - Presentations and Math formulas  
+- Send "3" - PDF documents, File downloads, URL previews
+- Send "4" - Table-only debugging (CSV and table formats)
 
 ### Environment Variables
 

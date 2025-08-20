@@ -33,12 +33,12 @@
 		const trimmed = content;
 		
 		// Direct media URL
-		const videoMatch = trimmed.match(/^(https?:\/\/[^\s]+\.(mp4|webm|mov|avi|mkv|m4v)(\?[^\s]*)?)$/i);
+		const videoMatch = trimmed.match(/^(https?:\/\/.*\.(mp4|webm|mov|avi|mkv|m4v)(\?.*)?)$/i);
 		if (videoMatch) {
 			return { url: videoMatch[1], type: 'video' };
 		}
 		
-		const audioMatch = trimmed.match(/^(https?:\/\/[^\s]+\.(mp3|wav|ogg|aac|m4a|flac)(\?[^\s]*)?)$/i);
+		const audioMatch = trimmed.match(/^(https?:\/\/.*\.(mp3|wav|ogg|aac|m4a|flac)(\?.*)?)$/i);
 		if (audioMatch) {
 			return { url: audioMatch[1], type: 'audio' };
 		}
@@ -66,12 +66,12 @@
 		}
 		
 		// URL mentioned in text
-		const urlVideoMatch = trimmed.match(/(https?:\/\/[^\s]+\.(mp4|webm|mov|avi|mkv|m4v)(\?[^\s]*)?)/i);
+		const urlVideoMatch = trimmed.match(/(https?:\/\/.*\.(mp4|webm|mov|avi|mkv|m4v)(\?.*)?)/i);
 		if (urlVideoMatch) {
 			return { url: urlVideoMatch[1], type: 'video' };
 		}
 		
-		const urlAudioMatch = trimmed.match(/(https?:\/\/[^\s]+\.(mp3|wav|ogg|aac|m4a|flac)(\?[^\s]*)?)/i);
+		const urlAudioMatch = trimmed.match(/(https?:\/\/.*\.(mp3|wav|ogg|aac|m4a|flac)(\?.*)?)/i);
 		if (urlAudioMatch) {
 			return { url: urlAudioMatch[1], type: 'audio' };
 		}
@@ -80,16 +80,14 @@
 	}
 
 	async function initializePlayer() {
-		console.log('MediaRenderer: initializePlayer called', { browser, mediaContainer: !!mediaContainer, content });
-		
+			
 		if (!browser || !mediaContainer) {
-			console.log('MediaRenderer: Aborting - no browser or container');
-			isLoading = false;
+				isLoading = false;
 			return;
 		}
 
 		try {
-			console.log('MediaRenderer: Starting initialization...');
+			console.log('🚀 mediarenderer is initialize');
 			isLoading = true;
 			hasError = false;
 			errorMessage = '';
@@ -104,18 +102,15 @@
 			mediaType = mediaInfo.type;
 			mediaTitle = mediaInfo.title || `${mediaType.charAt(0).toUpperCase() + mediaType.slice(1)} Player`;
 
-			console.log('MediaRenderer: Media info extracted', { mediaUrl, mediaType, mediaTitle });
-
+	
 			// For YouTube videos, use iframe embed
 			if (mediaUrl.includes('youtube.com/embed/')) {
-				console.log('MediaRenderer: Creating YouTube player');
-				createYouTubePlayer();
+					createYouTubePlayer();
 				return;
 			}
 
 			// Use native HTML5 player for all other media
-			console.log('MediaRenderer: Creating native player');
-			createNativePlayerDirect();
+				createNativePlayerDirect();
 
 		} catch (error: any) {
 			console.error('Media initialization error:', error);
@@ -138,11 +133,11 @@
 		
 		mediaContainer.appendChild(iframe);
 		isLoading = false;
+		console.log('✅ mediarenderer done rendering');
 	}
 
 	function createNativePlayerDirect() {
-		console.log('MediaRenderer: Creating native player for', mediaType, mediaUrl);
-		
+			
 		// Create native HTML5 element
 		const mediaElement = document.createElement(mediaType);
 		mediaElement.controls = true;
@@ -165,7 +160,6 @@
 		source.type = getMediaMimeType(mediaUrl);
 		mediaElement.appendChild(source);
 		
-		console.log('MediaRenderer: Created source with', { src: source.src, type: source.type });
 		
 		// Add fallback sources for better compatibility
 		if (mediaType === 'video' && !mediaUrl.includes('.webm')) {
@@ -176,24 +170,20 @@
 		}
 		
 		// Add to container
-		console.log('MediaRenderer: Adding to container', mediaContainer);
-		mediaContainer.appendChild(mediaElement);
-		console.log('MediaRenderer: Native player created successfully');
+			mediaContainer.appendChild(mediaElement);
+		console.log('✅ mediarenderer done rendering');
 		
 		// Set up event handlers
 		mediaElement.onloadstart = () => {
-			console.log('MediaRenderer: Media load started');
 			isLoading = true;
 		};
 		
 		mediaElement.onloadedmetadata = () => {
-			console.log('MediaRenderer: Media metadata loaded');
 			isLoading = false;
 			player = mediaElement; // Store reference for controls
 		};
 		
 		mediaElement.oncanplay = () => {
-			console.log('MediaRenderer: Media can play');
 			isLoading = false;
 		};
 		

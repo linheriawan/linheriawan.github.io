@@ -96,6 +96,7 @@
 			const { svg } = await mermaid.render(id, mermaidCode);
 			
 			renderedSvg = svg;
+			console.log('✅ mermaidrenderer done rendering');
 		} catch (error) {
 			console.error('Mermaid rendering error:', error);
 			hasError = true;
@@ -120,6 +121,7 @@
 
 	onMount(() => {
 		if (browser) {
+			console.log('🚀 mermaidrenderer is initialize');
 			initializeMermaid();
 			const mermaidCode = extractMermaidCode(content);
 			renderMermaid(mermaidCode);

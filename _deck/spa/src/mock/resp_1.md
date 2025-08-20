@@ -3,25 +3,25 @@ renderer to support visualizing the data in the conversation session.
 
 ## Single Image
 ```image
-https://picsum.photos/400/300?random=1
+http://localhost:8000/media/barbie-doll-clipart.jpg
 ```
 
 ## Multiple Images Gallery
 ```image
-https://picsum.photos/400/300?random=2
-https://picsum.photos/400/300?random=3
+http://localhost:8000/media/barbie-doll-clipart.jpg
+http://localhost:8000/media/barbie-movies.jpg
 ```
 
 ## Audio Test
 
 ```audio
-https://www.learningcontainer.com/wp-content/uploads/2020/02/Kalimba.mp3
+http://localhost:8000/media/KalimFrancis Lai - Love Storyba.mp3
 ```
 
 ## Video Test
 
 ```video
-https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4
+http://localhost:8000/media/shinchan0st.mp4
 ```
 
 ## Code Block

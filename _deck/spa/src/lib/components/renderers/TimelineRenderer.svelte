@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
 
 	interface Props {
@@ -244,6 +245,7 @@
 
 				// Fit timeline to show all items
 				timeline.fit();
+				console.log('✅ timelinerenderer done rendering');
 			};
 			// Race between loading and timeout
 			await Promise.race([loadPromise(), timeoutPromise]);
@@ -295,30 +297,26 @@
 		return timelineContent.length > 0;
 	}
 
-	// Use effect to initialize when container is available
-	$effect(() => {
-		// Stop triggering if already successfully initialized and rendered
-		if (initialized && timeline && !isLoading && !hasError) {
-			return;
-		}
-		
-		// Prevent re-initialization if already in progress or already has timeline
-		if (isLoading || timeline !== null) {
-			return;
-		}
-		
-		// Only initialize when we have complete timeline content and container is ready
-		const hasComplete = hasCompleteTimelineContent(content);
-		
-		if (browser && timelineContainer && hasComplete && !initialized) {
-			initialized = true; // Set immediately to prevent multiple initializations
-			initializeTimeline().catch(error => {
-				console.error('Timeline initialization failed:', error);
-				// Only reset initialized flag if timeline creation actually failed
-				if (timeline === null) {
-					initialized = false;
+	// Use onMount to initialize when component is ready
+	onMount(() => {
+		if (browser) {
+			console.log('🚀 timelinerenderer is initialize');
+			// Small delay to ensure DOM is ready
+			setTimeout(() => {
+				if (timelineContainer && !initialized && !isLoading) {
+					const hasComplete = hasCompleteTimelineContent(content);
+					if (hasComplete) {
+							initialized = true; // Set immediately to prevent multiple initializations
+						initializeTimeline().catch(error => {
+							console.error('Timeline initialization failed:', error);
+							// Only reset initialized flag if timeline creation actually failed
+							if (timeline === null) {
+								initialized = false;
+							}
+						});
+					}
 				}
-			});
+			}, 10);
 		}
 		
 		// Cleanup on component destroy

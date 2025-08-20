@@ -144,7 +144,9 @@
 
 	onMount(() => {
 		if (browser) {
+			console.log('🚀 mathrenderer is initialize');
 			renderedMath = renderMath(content);
+			console.log('✅ mathrenderer done rendering');
 		}
 	});
 
@@ -152,6 +154,7 @@
 	$effect(() => {
 		if (browser) {
 			renderedMath = renderMath(content);
+			console.log('✅ mathrenderer done rendering');
 		}
 	});
 </script>

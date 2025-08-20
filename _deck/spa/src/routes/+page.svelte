@@ -13,7 +13,6 @@
 	let inputText = $state('');
 	let chatHistory = $state<string[]>([]);
 	let messagesContainer: HTMLDivElement;
-	let renderingStrategy = 'stream-finish'; // Fixed strategy
 
 	// Auto-scroll to bottom function
 	function scrollToBottom() {
@@ -24,10 +23,29 @@
 		}
 	}
 
+	// Simulate streaming for demo content
+	async function simulateStreaming(content: string, messageId: number) {
+		const words = content.split(' ');
+		const chunkSize = Math.max(1, Math.floor(words.length / 20)); // ~20 chunks
+		
+		for (let i = 0; i < words.length; i += chunkSize) {
+			const chunk = words.slice(i, i + chunkSize).join(' ') + (i + chunkSize < words.length ? ' ' : '');
+			
+			messages = messages.map(msg => 
+				msg.id === messageId 
+					? { ...msg, text: msg.text + chunk }
+					: msg
+			);
+			
+			// Small delay to simulate network latency
+			await new Promise(resolve => setTimeout(resolve, 50));
+		}
+	}
+
 	// Auto-scroll when messages change
 	$effect(() => {
 		messages; // Subscribe to messages changes
-		scrollToBottom();
+		// scrollToBottom();
 	});
 	function newChat() {
 		// Add current conversation to history if it has content
@@ -49,27 +67,6 @@
 		inputText = '';
 	}
 
-	async function loadTestContent() {
-		try {
-			const response = await fetch('/src/mock/resp_1.md');
-			const testContent = await response.text();
-			
-			messages = [
-				...messages,
-				{ id: messages.length + 1, text: "Loading test content with multiple renderers...", sender: 'user' },
-				{ id: messages.length + 2, text: testContent, sender: 'ai' }
-			];
-		} catch (error) {
-			console.error('Failed to load test content:', error);
-			messages = [
-				...messages,
-				{ id: messages.length + 1, text: "Load test content", sender: 'user' },
-				{ id: messages.length + 2, text: "Failed to load test content. Here's a sample instead:\n\n```timeline\n[\n  {\n    \"id\": 1,\n    \"content\": \"Project Started\",\n    \"start\": \"2024-01-01\",\n    \"type\": \"point\"\n  }\n]\n```\n\n```chart\n{\n    \"type\": \"bar\",\n    \"data\": {\n        \"labels\": [\"Jan\", \"Feb\", \"Mar\"],\n        \"datasets\": [{ \"label\": \"Sales\", \"data\": [12, 19, 3] }]\n    }\n}\n```", sender: 'ai' }
-			];
-		}
-	}
-
-
 	async function sendMessage(event: SubmitEvent) {
 		event.preventDefault();
 		if (!inputText.trim()) return;
@@ -85,6 +82,42 @@
 
 		// Clear input immediately
 		inputText = '';
+
+		// Check for demo commands
+		const demoCommands = ['1', '2', '3','4'];
+		if (demoCommands.includes(userInput.trim())) {
+			const command = userInput.trim();
+			const fileMap = {
+				'1': '/src/mock/resp_1.md',
+				'2': '/src/mock/resp_2.md', 
+				'3': '/src/mock/resp_3.md',
+				'4': '/src/mock/resp_4.md'
+			};
+			
+			// Add empty AI message that will be filled by streaming
+			const aiMessageId = Date.now() + 1;
+			messages = [
+				...messages,
+				{ id: aiMessageId, text: '', sender: 'ai' }
+			];
+			
+			try {
+				const response = await fetch(fileMap[command]);
+				const testContent = await response.text();
+				
+				// Simulate streaming by adding content in chunks
+				await simulateStreaming(testContent, aiMessageId);
+				return;
+			} catch (error) {
+				console.error('Failed to load test content:', error);
+				messages = messages.map(msg => 
+					msg.id === aiMessageId 
+						? { ...msg, text: 'Failed to load demo content. Please check if the file exists.' }
+						: msg
+				);
+				return;
+			}
+		}
 
 		// Add empty AI message that will be filled by streaming
 		const aiMessageId = Date.now() + 1;
@@ -189,10 +222,9 @@
 					<div class="demo-help">
 						<small><strong>Try these:</strong></small>
 						<small>• Send "1" for mixed content demo</small>
-						<small>• Send "2" for math formulas</small>
-						<small>• Send "5" for presentations</small>
-						<small>• Send "6" for PDF documents</small>
-						<small>• Send "7" for files & URLs</small>
+						<small>• Send "2" for Presentations and Math formulas</small>
+						<small>• Send "3" for PDF documents, File downloads and URL previews</small>
+						<small>• Send "4" for table-only debugging</small>
 						<small>• Send any text for real AI chat</small>
 					</div>
 				</div>
@@ -206,24 +238,11 @@
 
 	<!-- Main Chat -->
 	<main class="main-chat">
-		<!-- Rendering Strategy Control -->
-		<div class="strategy-control">
-			<label>
-				<strong>Rendering Strategy:</strong>
-				<select bind:value={renderingStrategy}>
-					<option value="stream-finish">Stream Finish (Wait for complete)</option>
-					<option value="realtime">Realtime (Render as typing)</option>
-				</select>
-			</label>
-			<button onclick={loadTestContent} class="test-button">
-				Load Test Content
-			</button>
-		</div>
 
 		<!-- Messages -->
 		<div class="messages" bind:this={messagesContainer}>
 			{#each messages as msg}
-				<MessageRenderer content={msg.text} sender={msg.sender} {renderingStrategy} />
+				<MessageRenderer content={msg.text} sender={msg.sender} />
 			{/each}
 		</div>
 
@@ -270,43 +289,4 @@
 		color: #fff;
 	}
 
-	.strategy-control {
-		padding: 0.5rem 1rem;
-		background-color: rgba(0, 0, 0, 0.3);
-		border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-		font-size: 0.8rem;
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-	}
-
-	.strategy-control label {
-		display: flex;
-		align-items: center;
-		gap: 0.5rem;
-	}
-
-	.strategy-control select {
-		background-color: rgba(0, 0, 0, 0.5);
-		color: white;
-		border: 1px solid rgba(255, 255, 255, 0.2);
-		border-radius: 4px;
-		padding: 0.25rem 0.5rem;
-		font-size: 0.8rem;
-	}
-
-	.test-button {
-		background-color: #0b69a3;
-		color: white;
-		border: none;
-		border-radius: 4px;
-		padding: 0.25rem 0.5rem;
-		font-size: 0.8rem;
-		cursor: pointer;
-		margin-left: auto;
-	}
-
-	.test-button:hover {
-		background-color: #0958a3;
-	}
 </style>

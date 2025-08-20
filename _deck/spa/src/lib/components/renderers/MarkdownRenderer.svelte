@@ -9,10 +9,9 @@
 
 	interface Props {
 		content: string;
-		renderingStrategy?: 'realtime' | 'stream-finish';
 	}
 
-	let { content, renderingStrategy = 'stream-finish' }: Props = $props();
+	let { content }: Props = $props();
 	let renderedHtml = $state<string>('');
 	let containerElement: HTMLDivElement;
 
@@ -41,25 +40,20 @@
 	// Custom renderer for better chat styling
 	const renderer = new marked.Renderer();
 	
-	// Check if a code block is complete by looking for closing ```
-	function isCodeBlockComplete(fullContent: string, codeBlockMatch: RegExpMatchArray): boolean {
-		if (!codeBlockMatch) return false;
-		
-		const beforeCodeBlock = fullContent.substring(0, codeBlockMatch.index || 0);
-		const codeBlockStart = codeBlockMatch[0];
-		const afterCodeBlockStart = fullContent.substring((codeBlockMatch.index || 0) + codeBlockStart.length);
-		
-		// Count opening ``` (including the one we found)
-		const openingBlocks = (beforeCodeBlock.match(/```/g) || []).length + 1;
-		// Count closing ``` after our code block
-		const closingBlocks = (afterCodeBlockStart.match(/```/g) || []).length;
-		
-		// Code block is complete if we have a matching closing ```
-		return closingBlocks >= 1 && afterCodeBlockStart.includes('```');
-	}
-
 	// Helper function to register child renderer
 	function registerChildRenderer(type: ChildRenderer['type'], code: string): string {
+		// Simple deduplication: check for existing renderer with same type and exact code match
+		const existingRenderer = Array.from(childRenderers.values()).find(renderer => 
+			renderer.type === type && renderer.code.trim() === code.trim() && renderer.isComplete
+		);
+		
+		if (existingRenderer) {
+			return `<div class="renderer-wrapper">
+				<div class="${type}-container" id="${existingRenderer.containerId}"></div>
+				<div class="renderer-note">🔧 ${getRendererName(type)} ${existingRenderer.isComplete ? '✅' : '⏳'}</div>
+			</div>`;
+		}
+		
 		const id = `${type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 		const containerId = `${id}-container`;
 		
@@ -74,15 +68,6 @@
 		
 		const codeComplete = isCodeComplete(type, code);
 		const isComplete = isBlockComplete && codeComplete;
-		
-		console.log(`Registering ${type} renderer:`, {
-			id,
-			type,
-			codeLength: code.length,
-			isBlockComplete,
-			codeComplete,
-			isComplete
-		});
 		
 		// Register in our system
 		childRenderers.set(id, {
@@ -132,7 +117,6 @@
 					/^https?:\/\/[^\s]+\.(mp4|webm|mov|avi|mkv|m4v|mp3|wav|ogg|aac|m4a|flac)(\?[^\s]*)?$/i.test(url) ||
 					/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/.test(url)
 				);
-				console.log('Media completion check:', { code, mediaUrls, isValid });
 				return isValid;
 			case 'image':
 				// Check for valid image URLs - can be multiple URLs on separate lines
@@ -233,11 +217,6 @@
 	async function processChildRenderers() {
 		if (!browser || !containerElement || isProcessing) return;
 		
-		console.log('Processing child renderers...', {
-			rendererCount: childRenderers.size,
-			containerElement: !!containerElement
-		});
-		
 		isProcessing = true;
 		try {
 			// Import components once
@@ -249,12 +228,6 @@
 
 			// Process each registered child renderer
 			for (const [id, renderer] of childRenderers.entries()) {
-				console.log(`Processing renderer ${id}:`, {
-					type: renderer.type,
-					isInitialized: renderer.isInitialized,
-					isComplete: renderer.isComplete,
-					containerId: renderer.containerId
-				});
 				
 				// Skip if already initialized
 				if (renderer.isInitialized) continue;
@@ -272,18 +245,12 @@
 					const codeComplete = isCodeComplete(renderer.type, renderer.code);
 					renderer.isComplete = isBlockComplete && codeComplete;
 					
-					console.log(`Re-checked completion for ${id}:`, {
-						isBlockComplete,
-						codeComplete,
-						isComplete: renderer.isComplete
-					});
 					
 					if (!renderer.isComplete) continue;
 				}
 
 				// Find the container
 				const container = containerElement.querySelector(`#${renderer.containerId}`);
-				console.log(`Looking for container ${renderer.containerId}:`, !!container);
 				if (!container) continue;
 
 				// Initialize the renderer
@@ -291,24 +258,20 @@
 					const { mount } = await import('svelte');
 					const componentClass = getRendererComponent(components, renderer.type);
 					
-					console.log(`Mounting ${renderer.type} component:`, !!componentClass);
-					
+						
 					if (componentClass && !renderer.component) {
 						const formattedContent = formatContentForRenderer(renderer);
-						
-						console.log(`Formatted content for ${renderer.type}:`, formattedContent);
-						
+							
 						renderer.component = mount(componentClass, {
 							target: container,
 							props: {
-								content: formattedContent,
-								renderingStrategy
+								content: formattedContent
 							}
 						});
 						
 						// Mark as initialized
 						renderer.isInitialized = true;
-						console.log(`Successfully mounted ${renderer.type} renderer`);
+						console.log(`✅ ${renderer.type} renderer initialized`);
 					}
 				} catch (error) {
 					console.error(`Error initializing ${renderer.type} renderer:`, error);
@@ -449,7 +412,7 @@
 	// Import renderer components dynamically
 	async function importRendererComponents() {
 		try {
-			console.log('Importing renderer components...');
+			console.log('🚀 Initializing renderer components...');
 			const components = await Promise.all([
 				import('./TimelineRenderer.svelte'),
 				import('./ChartRenderer.svelte'), 
@@ -462,7 +425,6 @@
 				import('./TableRenderer.svelte')
 			]);
 
-			console.log('Components imported successfully:', components);
 			return {
 				TimelineRenderer: components[0].default,
 				ChartRenderer: components[1].default,
@@ -554,11 +516,11 @@
 		}
 	}
 
-	onMount(() => {
-		if (browser) {
-			renderContent();
-		}
-	});
+	// onMount(() => {
+	// 	if (browser) {
+	// 		renderContent();
+	// 	}
+	// });
 
 	// Re-render when content changes
 	$effect(() => {

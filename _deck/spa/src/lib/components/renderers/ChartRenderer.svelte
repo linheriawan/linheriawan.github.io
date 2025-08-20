@@ -207,6 +207,7 @@
 			};
 
 			chartInstance = new Chart(chartElement, config);
+			console.log('✅ chartrenderer done rendering');
 			
 		} catch (error: any) {
 			console.error('Chart rendering error:', error);
@@ -242,6 +243,7 @@
 
 	onMount(() => {
 		if (browser) {
+			console.log('🚀 chartrenderer is initialize');
 			renderChart();
 		}
 	});

@@ -99,6 +99,7 @@
 	function handleImageLoad() {
 		isLoading = false;
 		hasError = false;
+		console.log('✅ imagerenderer done rendering');
 
 		if (imageElement) {
 			imageInfo = {
@@ -206,6 +207,7 @@
 
 	onMount(() => {
 		if (browser) {
+			console.log('🚀 imagerenderer is initialize');
 			// Cleanup PhotoSwipe on unmount
 			return () => {
 				if (photoSwipe) {

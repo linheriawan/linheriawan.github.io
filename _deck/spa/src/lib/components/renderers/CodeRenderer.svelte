@@ -71,14 +71,17 @@
 	}
 
 	onMount(() => {
+		console.log('🚀 coderenderer is initialize');
 		const { language, code } = extractCodeFromMarkdown(content);
 		highlightedCode = highlightCode(code, language);
+		console.log('✅ coderenderer done rendering');
 	});
 
 	// Re-highlight when content changes
 	$effect(() => {
 		const { language, code } = extractCodeFromMarkdown(content);
 		highlightedCode = highlightCode(code, language);
+		console.log('✅ coderenderer done rendering');
 	});
 </script>
 
