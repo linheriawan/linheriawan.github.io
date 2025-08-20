@@ -6,19 +6,18 @@
 	}
 
 	let { content }: Props = $props();
-	let gridContainer: HTMLDivElement;
-	let gridApi: any = null;
+	let tableContainer: HTMLDivElement;
 	let isLoading = $state<boolean>(true);
 	let hasError = $state<boolean>(false);
 	let errorMessage = $state<string>('');
 	let tableData = $state<{
-		columnDefs: any[];
-		rowData: any[];
+		columns: string[];
+		rows: string[][];
 		totalRows: number;
 		hasHeaders: boolean;
 	}>({
-		columnDefs: [],
-		rowData: [],
+		columns: [],
+		rows: [],
 		totalRows: 0,
 		hasHeaders: false
 	});
@@ -36,7 +35,7 @@
 
 	function parseTableContent(text: string) {
 		const content = extractContent(text);
-		console.log('Parsing table content:', content);
+		
 		try {
 			// Try JSON first (chart data might be tables)
 			if (content.startsWith('{') || content.startsWith('[')) {
@@ -45,19 +44,13 @@
 				if (Array.isArray(jsonData)) {
 					// Array of objects
 					if (jsonData.length > 0 && typeof jsonData[0] === 'object') {
-						const columns = Object.keys(jsonData[0]).map(key => ({
-							headerName: key.charAt(0).toUpperCase() + key.slice(1),
-							field: key,
-							sortable: true,
-							filter: true,
-							resizable: true,
-							width: 150
-						}));
+						const columns = Object.keys(jsonData[0]);
+						const rows = jsonData.map(obj => columns.map(col => String(obj[col] || '')));
 						
 						return {
-							columnDefs: columns,
-							rowData: jsonData,
-							totalRows: jsonData.length,
+							columns: columns.map(col => col.charAt(0).toUpperCase() + col.slice(1)),
+							rows,
+							totalRows: rows.length,
 							hasHeaders: true
 						};
 					}
@@ -65,19 +58,13 @@
 					// Chart.js format with data
 					const data = jsonData.data;
 					if (data.length > 0 && typeof data[0] === 'object') {
-						const columns = Object.keys(data[0]).map(key => ({
-							headerName: key.charAt(0).toUpperCase() + key.slice(1),
-							field: key,
-							sortable: true,
-							filter: true,
-							resizable: true,
-							width: 150
-						}));
+						const columns = Object.keys(data[0]);
+						const rows = data.map(obj => columns.map(col => String(obj[col] || '')));
 						
 						return {
-							columnDefs: columns,
-							rowData: data,
-							totalRows: data.length,
+							columns: columns.map(col => col.charAt(0).toUpperCase() + col.slice(1)),
+							rows,
+							totalRows: rows.length,
 							hasHeaders: true
 						};
 					}
@@ -85,9 +72,7 @@
 			}
 
 			// Parse CSV/TSV format
-			console.log('Parsing as CSV/TSV...');
 			const lines = content.split('\n').filter(line => line.trim());
-			console.log('Lines found:', lines.length, lines);
 			if (lines.length === 0) {
 				throw new Error('No data found');
 			}
@@ -108,7 +93,6 @@
 				}
 			});
 
-			console.log('Parsed rows:', rows);
 			if (rows.length === 0 || rows[0].length === 0) {
 				throw new Error('Invalid table format');
 			}
@@ -137,65 +121,68 @@
 				}
 			}
 
-			// Create column definitions
-			const numCols = rows[0].length;
-			const columnDefs = [];
-
-			for (let i = 0; i < numCols; i++) {
-				const headerName = hasHeaders && headerRowIndex >= 0 
-					? rows[headerRowIndex][i] || `Column ${i + 1}`
-					: `Column ${i + 1}`;
-				
-				columnDefs.push({
-					headerName: headerName,
-					field: `col${i}`,
-					sortable: true,
-					filter: true,
-					resizable: true,
-					width: 150,
-					// Auto-detect number columns for better sorting
-					type: 'text'
-				});
-			}
-
-			// Create row data
+			// Get columns and data rows
+			const columns = hasHeaders && headerRowIndex >= 0 
+				? rows[headerRowIndex] 
+				: rows[0].map((_, i) => `Column ${i + 1}`);
+			
 			const dataRows = rows.slice(dataStartIndex);
-			const rowData = dataRows.map((row, index) => {
-				const rowObj: any = { id: index };
-				for (let i = 0; i < numCols; i++) {
-					const value = row[i] || '';
-					rowObj[`col${i}`] = value;
-					
-					// Try to detect numeric columns for better UX
-					if (!isNaN(Number(value)) && value !== '') {
-						if (!columnDefs[i].type || columnDefs[i].type === 'text') {
-							columnDefs[i].type = 'numericColumn';
-							columnDefs[i].width = 120;
-						}
-					}
-				}
-				return rowObj;
-			});
 
-			const result = {
-				columnDefs,
-				rowData,
-				totalRows: rowData.length,
+			return {
+				columns,
+				rows: dataRows,
+				totalRows: dataRows.length,
 				hasHeaders
 			};
-			console.log('Final table result:', result);
-			return result;
 
 		} catch (error: any) {
 			console.error('Table parsing error:', error);
-			console.error('Failed to parse content:', text);
 			throw new Error(`Failed to parse table data: ${error.message}`);
 		}
 	}
 
-	async function initializeGrid() {
-		if (!browser || !gridContainer) {
-			console.log('Browser or gridContainer not available:', { browser, gridContainer });
+	function createHtmlTable() {
+		if (!tableContainer || !tableData.rows.length) return;
+		
+		// Create a simple HTML table
+		const table = document.createElement('table');
+		table.className = 'native-table';
+		
+		// Create header if we have one
+		if (tableData.hasHeaders && tableData.columns.length) {
+			const thead = document.createElement('thead');
+			const headerRow = document.createElement('tr');
+			
+			tableData.columns.forEach(colName => {
+				const th = document.createElement('th');
+				th.textContent = colName;
+				headerRow.appendChild(th);
+			});
+			thead.appendChild(headerRow);
+			table.appendChild(thead);
+		}
+		
+		// Create body
+		const tbody = document.createElement('tbody');
+		tableData.rows.forEach(row => {
+			const tr = document.createElement('tr');
+			
+			row.forEach(cellValue => {
+				const td = document.createElement('td');
+				td.textContent = cellValue;
+				tr.appendChild(td);
+			});
+			tbody.appendChild(tr);
+		});
+		table.appendChild(tbody);
+		
+		// Clear container and add table
+		tableContainer.innerHTML = '';
+		tableContainer.appendChild(table);
+	}
+
+	function initializeTable() {
+		if (!browser || !tableContainer) {
 			isLoading = false;
 			return;
 		}
@@ -204,374 +191,72 @@
 			isLoading = true;
 			hasError = false;
 			
-			// Clean up any existing content
-			if (gridContainer) {
-				gridContainer.innerHTML = '';
-			}
-			
-			console.log('Initializing grid with container:', gridContainer);
-
 			// Parse the content
-			console.log('Content to parse:', JSON.stringify(content));
 			tableData = parseTableContent(content);
-			console.log('Parsed table data:', tableData);
 
-			if (tableData.rowData.length === 0) {
-				console.error('No rows found in parsed data!');
+			if (tableData.rows.length === 0) {
 				throw new Error('No data rows found');
 			}
 
-			console.log('Table data is valid, proceeding with grid creation...');
-
-			// Dynamic import ag-grid with module registration
-			let createGrid;
-			try {
-				const agGrid = await import('ag-grid-community');
-				console.log('ag-grid import:', agGrid);
-				
-				// Register all community modules
-				const { ModuleRegistry, AllCommunityModule } = agGrid;
-				if (ModuleRegistry && AllCommunityModule) {
-					console.log('Registering AllCommunityModule...');
-					ModuleRegistry.registerModules([AllCommunityModule]);
-					console.log('AllCommunityModule registered successfully');
-				} else {
-					console.warn('ModuleRegistry or AllCommunityModule not found:', {
-						ModuleRegistry: !!ModuleRegistry,
-						AllCommunityModule: !!AllCommunityModule
-					});
-				}
-				
-				// Get createGrid function
-				createGrid = agGrid.createGrid || agGrid.default?.createGrid;
-				
-				if (!createGrid) {
-					console.error('createGrid not found in ag-grid import:', Object.keys(agGrid));
-					throw new Error('createGrid function not found');
-				}
-				console.log('Found createGrid function:', typeof createGrid);
-			} catch (importError) {
-				console.error('Failed to import ag-grid:', importError);
-				throw importError;
-			}
-
-			// Convert reactive state to plain objects to avoid proxy issues
-			const plainColumnDefs = JSON.parse(JSON.stringify(tableData.columnDefs));
-			const plainRowData = JSON.parse(JSON.stringify(tableData.rowData));
-			
-			// Grid options - use plain objects instead of reactive ones
-			const gridOptions = {
-				columnDefs: plainColumnDefs,
-				rowData: plainRowData,
-				defaultColDef: {
-					sortable: true,
-					filter: true,
-					resizable: true,
-					minWidth: 100,
-					flex: 1
-				},
-				rowSelection: 'multiple',
-				enableRangeSelection: true,
-				enableCellTextSelection: true,
-				ensureDomOrder: true,
-				animateRows: true,
-				// Pagination for large datasets
-				pagination: tableData.totalRows > 100,
-				paginationPageSize: 50,
-				// Auto-size columns to fit content
-				onGridReady: (params) => {
-					console.log('Grid ready callback triggered', params);
-					gridApi = params.api;
-					setTimeout(() => {
-						if (gridApi) {
-							gridApi.sizeColumnsToFit();
-						}
-					}, 100);
-				},
-				onFirstDataRendered: (params) => {
-					console.log('First data rendered callback triggered', params);
-					if (params.api) {
-						params.api.sizeColumnsToFit();
-					}
-				}
-			};
-
-			// Import ag-grid CSS - load both base and dark theme
-			const agGridCss = document.createElement('link');
-			agGridCss.rel = 'stylesheet';
-			agGridCss.href = 'https://cdn.jsdelivr.net/npm/ag-grid-community@34.0.0/styles/ag-grid.css';
-			if (!document.head.querySelector('link[href*="ag-grid.css"]')) {
-				document.head.appendChild(agGridCss);
-			}
-			
-			const agThemeCss = document.createElement('link');
-			agThemeCss.rel = 'stylesheet';
-			agThemeCss.href = 'https://cdn.jsdelivr.net/npm/ag-grid-community@34.0.0/styles/ag-theme-quartz.css';
-			if (!document.head.querySelector('link[href*="ag-theme-quartz.css"]')) {
-				document.head.appendChild(agThemeCss);
-			}
-			
-			// Wait a moment for CSS to be available
-			await new Promise(resolve => setTimeout(resolve, 200));
-
-			// Create grid
-			console.log('Creating grid with container dimensions:', {
-				width: gridContainer.offsetWidth,
-				height: gridContainer.offsetHeight,
-				containerRect: gridContainer.getBoundingClientRect()
-			});
-			console.log('Creating grid with options:', gridOptions);
-			
-			// Ensure container has dimensions
-			if (gridContainer.offsetHeight === 0) {
-				gridContainer.style.height = '400px';
-			}
-			if (gridContainer.offsetWidth === 0) {
-				gridContainer.style.width = '100%';
-			}
-			
-			console.log('Calling createGrid with:', { 
-				container: gridContainer, 
-				optionsKeys: Object.keys(gridOptions),
-				containerDimensions: {
-					width: gridContainer.offsetWidth,
-					height: gridContainer.offsetHeight
-				}
-			});
-			
-			const api = createGrid(gridContainer, gridOptions);
-			console.log('Grid created, API result:', {
-				api: api,
-				type: typeof api,
-				isNull: api === null,
-				isUndefined: api === undefined,
-				keys: api ? Object.keys(api) : 'N/A'
-			});
-			
-			console.log('Grid container after creation:', {
-				width: gridContainer.offsetWidth,
-				height: gridContainer.offsetHeight,
-				children: gridContainer.children.length,
-				innerHTML: gridContainer.innerHTML.length > 0 ? 'Has content' : 'Empty'
-			});
-			
-			// Store grid API reference (it should be set in onGridReady callback)
-			if (api) {
-				gridApi = api;
-				console.log('Grid API stored from return value');
-			} else {
-				console.warn('createGrid returned', api, ', waiting for onGridReady callback');
-			}
-			
-			// Force grid to refresh and size columns
-			setTimeout(() => {
-				if (gridApi) {
-					console.log('Refreshing grid and sizing columns...');
-					gridApi.refreshCells();
-					gridApi.sizeColumnsToFit();
-					
-					// Also try manual column sizing
-					const allColumnIds = tableData.columnDefs.map(col => col.field);
-					gridApi.autoSizeColumns(allColumnIds);
-				}
-			}, 300);
+			// Create native HTML table
+			createHtmlTable();
 
 		} catch (error: any) {
-			console.error('Grid initialization error:', error);
-			
-			// First, try HTML table fallback with actual data
-			console.log('Trying HTML table fallback with actual data...');
-			try {
-				createHtmlTable();
-				return; // Exit successfully if HTML table works
-			} catch (htmlError) {
-				console.error('HTML table fallback failed:', htmlError);
-			}
-			
-			// Fallback test with hardcoded data to verify grid works
-			console.log('Trying fallback with test data...');
-			try {
-				const testData = {
-					columnDefs: [
-						{ headerName: 'Name', field: 'name', sortable: true, filter: true },
-						{ headerName: 'Age', field: 'age', sortable: true, filter: true },
-						{ headerName: 'City', field: 'city', sortable: true, filter: true }
-					],
-					rowData: [
-						{ name: 'John', age: 30, city: 'New York' },
-						{ name: 'Jane', age: 25, city: 'San Francisco' },
-						{ name: 'Bob', age: 35, city: 'Chicago' }
-					],
-					totalRows: 3,
-					hasHeaders: true
-				};
-				
-				const testOptions = {
-					columnDefs: testData.columnDefs,
-					rowData: testData.rowData,
-					defaultColDef: {
-						sortable: true,
-						filter: true,
-						resizable: true,
-						minWidth: 100,
-						flex: 1
-					}
-				};
-				
-				await Promise.all([
-					import('ag-grid-community/styles/ag-grid.css'),
-					import('ag-grid-community/styles/ag-theme-alpine.css')
-				]);
-				
-				const agGrid = await import('ag-grid-community');
-				
-				// Register modules for fallback test too
-				const { ModuleRegistry, AllCommunityModule, createGrid } = agGrid;
-				if (ModuleRegistry && AllCommunityModule) {
-					ModuleRegistry.registerModules([AllCommunityModule]);
-				}
-				
-				const testApi = createGrid(gridContainer, testOptions);
-				gridApi = testApi;
-				console.log('Fallback test grid created successfully!');
-				
-			} catch (fallbackError) {
-				console.error('Even fallback failed:', fallbackError);
-				
-				// Last resort: try to create a simple HTML table
-				console.log('Trying HTML table fallback...');
-				try {
-					createHtmlTable();
-				} catch (htmlError) {
-					console.error('HTML table fallback also failed:', htmlError);
-					hasError = true;
-					errorMessage = `AG-Grid failed: ${error.message}`;
-				}
-			}
+			console.error('Table initialization error:', error);
+			hasError = true;
+			errorMessage = error.message || 'Failed to initialize table';
 		} finally {
 			isLoading = false;
 		}
 	}
 
-	function exportToCsv() {
-		if (gridApi) {
-			gridApi.exportDataAsCsv({
-				fileName: 'table-data.csv'
-			});
-		}
-	}
-
 	function copyTableData() {
-		if (gridApi) {
-			// Get all data and convert to CSV format
-			const allData = gridApi.getSelectedRows().length > 0 
-				? gridApi.getSelectedRows() 
-				: tableData.rowData;
-			
-			const csvContent = [
-				// Headers
-				tableData.columnDefs.map(col => col.headerName).join('\t'),
-				// Data rows
-				...allData.map(row => 
-					tableData.columnDefs.map(col => row[col.field] || '').join('\t')
-				)
-			].join('\n');
+		// Get all data and convert to CSV format
+		const csvContent = [
+			// Headers if present
+			...(tableData.hasHeaders ? [tableData.columns.join('\t')] : []),
+			// Data rows
+			...tableData.rows.map(row => row.join('\t'))
+		].join('\n');
 
-			navigator.clipboard.writeText(csvContent).then(() => {
-				console.log('Table data copied to clipboard');
-			}).catch(err => {
-				console.error('Failed to copy table data:', err);
-			});
-		}
+		navigator.clipboard.writeText(csvContent).then(() => {
+			console.log('Table data copied to clipboard');
+		}).catch(err => {
+			console.error('Failed to copy table data:', err);
+		});
 	}
 
-	function createHtmlTable() {
-		console.log('Creating HTML table fallback...');
-		if (!gridContainer || !tableData.rowData.length) return;
-		
-		// Create a simple HTML table as fallback
-		const table = document.createElement('table');
-		table.style.cssText = `
-			width: 100%;
-			border-collapse: collapse;
-			color: #e5e5e5;
-			font-family: Monaco, Menlo, 'Ubuntu Mono', monospace;
-			font-size: 13px;
-		`;
-		
-		// Create header
-		const thead = document.createElement('thead');
-		const headerRow = document.createElement('tr');
-		headerRow.style.cssText = 'background-color: rgba(0, 0, 0, 0.3);';
-		
-		tableData.columnDefs.forEach(col => {
-			const th = document.createElement('th');
-			th.textContent = col.headerName;
-			th.style.cssText = `
-				padding: 8px 12px;
-				text-align: left;
-				border: 1px solid rgba(255, 255, 255, 0.1);
-				font-weight: 600;
-			`;
-			headerRow.appendChild(th);
-		});
-		thead.appendChild(headerRow);
-		table.appendChild(thead);
-		
-		// Create body
-		const tbody = document.createElement('tbody');
-		tableData.rowData.forEach((row, index) => {
-			const tr = document.createElement('tr');
-			if (index % 2 === 1) {
-				tr.style.backgroundColor = 'rgba(255, 255, 255, 0.02)';
-			}
-			tr.style.cssText += 'transition: background-color 0.2s ease;';
-			tr.onmouseover = () => tr.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
-			tr.onmouseout = () => tr.style.backgroundColor = index % 2 === 1 ? 'rgba(255, 255, 255, 0.02)' : '';
-			
-			tableData.columnDefs.forEach(col => {
-				const td = document.createElement('td');
-				td.textContent = row[col.field] || '';
-				td.style.cssText = `
-					padding: 8px 12px;
-					border: 1px solid rgba(255, 255, 255, 0.1);
-				`;
-				tr.appendChild(td);
-			});
-			tbody.appendChild(tr);
-		});
-		table.appendChild(tbody);
-		
-		// Clear container and add table
-		gridContainer.innerHTML = '';
-		gridContainer.appendChild(table);
-		
-		console.log('HTML table fallback created successfully');
-	}
+	function downloadTableData() {
+		const csvContent = [
+			// Headers if present
+			...(tableData.hasHeaders ? [tableData.columns.join(',')] : []),
+			// Data rows (escape commas in CSV)
+			...tableData.rows.map(row => 
+				row.map(cell => cell.includes(',') ? `"${cell}"` : cell).join(',')
+			)
+		].join('\n');
 
+		const blob = new Blob([csvContent], { type: 'text/csv' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = 'table-data.csv';
+		a.click();
+		URL.revokeObjectURL(url);
+	}
 
 	// Use effect to initialize when container is available
 	$effect(() => {
-		console.log('Table effect triggered');
-		console.log('Browser available:', browser);
-		console.log('Grid container:', gridContainer);
-		console.log('Content:', content);
-		console.log('Already initialized:', initialized);
-		
-		if (browser && gridContainer && content && !initialized) {
-			console.log('All conditions met, initializing table grid');
+		if (browser && tableContainer && content && !initialized) {
 			initialized = true;
-			initializeGrid();
+			initializeTable();
 		}
 		
 		// Cleanup on component destroy
 		return () => {
-			console.log('Table cleanup');
-			if (gridApi) {
-				gridApi.destroy();
-				gridApi = null;
+			if (tableContainer) {
+				tableContainer.innerHTML = '';
 			}
-			initialized = true;
 		};
 	});
 </script>
@@ -588,7 +273,7 @@
 				Failed to Load Table
 			</div>
 			<div class="error-message">{errorMessage}</div>
-			<button class="retry-button" onclick={() => { hasError = false; isLoading = true; initializeGrid(); }}>
+			<button class="retry-button" onclick={() => { hasError = false; isLoading = true; initializeTable(); }}>
 				Retry
 			</button>
 		</div>
@@ -597,7 +282,7 @@
 			<div class="table-info">
 				{#if !isLoading}
 					<span class="table-stats">
-						{tableData.totalRows} rows × {tableData.columnDefs.length} columns
+						{tableData.totalRows} rows × {tableData.columns.length} columns
 					</span>
 					{#if tableData.hasHeaders}
 						<span class="table-type">With Headers</span>
@@ -618,8 +303,8 @@
 					</button>
 					<button 
 						class="action-button" 
-						onclick={exportToCsv}
-						title="Export CSV"
+						onclick={downloadTableData}
+						title="Download CSV"
 					>
 						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 							<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -631,19 +316,18 @@
 			</div>
 		</div>
 
-		<div class="grid-container" class:loading={isLoading}>
+		<div class="table-content" class:loading={isLoading}>
 			{#if isLoading}
 				<div class="loading-container">
 					<div class="loading-spinner"></div>
 					<span>Loading table...</span>
 				</div>
+			{:else}
+				<div 
+					bind:this={tableContainer}
+					class="table-container"
+				></div>
 			{/if}
-			
-			<div 
-				bind:this={gridContainer}
-				class="ag-theme-quartz-dark grid-wrapper"
-				class:hidden={isLoading}
-			></div>
 		</div>
 	{/if}
 </div>
@@ -656,11 +340,9 @@
 		background-color: rgba(0, 0, 0, 0.2);
 		border: 1px solid rgba(255, 255, 255, 0.1);
 		width: 100%;
-		max-height: 200px;
-		min-width: 700px;
-		max-width: 95vw;
+		max-width: 100%;
 	}
-	:global(.ag-root.ag-layout-normal){max-height:150px;overflow: scroll !important;}
+
 	.table-header {
 		display: flex;
 		justify-content: space-between;
@@ -718,132 +400,74 @@
 		color: #ffffff;
 	}
 
-	.grid-container {
+	.table-content {
 		position: relative;
-		height: 300px;
-		min-height: 350px;
-		max-height: 70vh;
 		background-color: rgba(0, 0, 0, 0.1);
 		width: 100%;
-		overflow: hidden;
+		max-height: 400px;
+		overflow: auto;
 	}
 
-	.grid-container.loading {
+	.table-content.loading {
 		display: flex;
 		align-items: center;
 		justify-content: center;
+		min-height: 200px;
 	}
 
-	.grid-wrapper {
+	.table-container {
 		width: 100%;
 		height: 100%;
-		min-height: 300px;
-		box-sizing: border-box;
+		overflow: auto;
 	}
 
-	.grid-wrapper.hidden {
-		display: none;
+	/* Native table styling */
+	:global(.native-table) {
+		width: 100%;
+		border-collapse: collapse;
+		color: #e5e5e5;
+		font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+		font-size: 13px;
+		background-color: transparent;
 	}
 
-	/* Ag-Grid Dark Theme Customizations - Force dark theme */
-	:global(.ag-theme-quartz-dark) {
-		background-color: #1a1a1a !important;
-		--ag-background-color: #1a1a1a !important;
-		--ag-header-background-color: #2d2d2d !important;
-		--ag-odd-row-background-color: #222222 !important;
-		--ag-row-hover-color: #333333 !important;
-		--ag-selected-row-background-color: rgba(11, 105, 163, 0.4) !important;
-		--ag-border-color: #444444 !important;
-		--ag-header-column-separator-color: #444444 !important;
-		--ag-font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
-		--ag-font-size: 13px !important;
-		--ag-foreground-color: #ffffff !important;
-		--ag-data-color: #ffffff !important;
-		--ag-header-foreground-color: #ffffff !important;
-		--ag-disabled-foreground-color: #888888 !important;
-		--ag-input-border-color: #444444 !important;
-		--ag-checkbox-background-color: #2d2d2d !important;
-		--ag-control-panel-background-color: #1a1a1a !important;
-		--ag-tooltip-background-color: #2d2d2d !important;
+	:global(.native-table th) {
+		padding: 8px 12px;
+		text-align: left;
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		font-weight: 600;
+		background-color: rgba(0, 0, 0, 0.3);
+		color: #ffffff;
+		position: sticky;
+		top: 0;
+		z-index: 1;
 	}
 
-	:global(.ag-theme-quartz-dark .ag-header-cell-label) {
-		color: #ffffff !important;
-		font-weight: 600 !important;
-	}
-	
-	:global(.ag-theme-quartz-dark .ag-cell) {
-		color: #ffffff !important;
-		background-color: #1a1a1a !important;
-		border-color: #444444 !important;
+	:global(.native-table td) {
+		padding: 8px 12px;
+		border: 1px solid rgba(255, 255, 255, 0.1);
+		color: #ffffff;
+		background-color: rgba(0, 0, 0, 0.1);
 	}
 
-	:global(.ag-theme-quartz-dark .ag-header-cell) {
-		background-color: #2d2d2d !important;
-		border-color: #444444 !important;
-		color: #ffffff !important;
+	:global(.native-table tbody tr:nth-child(even)) {
+		background-color: rgba(255, 255, 255, 0.02);
 	}
 
-	:global(.ag-theme-quartz-dark .ag-row) {
-		background-color: #1a1a1a !important;
-		border-color: #444444 !important;
+	:global(.native-table tbody tr:nth-child(odd)) {
+		background-color: rgba(0, 0, 0, 0.1);
 	}
 
-	:global(.ag-theme-quartz-dark .ag-row-selected) {
-		background-color: rgba(11, 105, 163, 0.4) !important;
-		border-color: #0b69a3 !important;
+	:global(.native-table tbody tr:hover) {
+		background-color: rgba(255, 255, 255, 0.05);
 	}
 
-	:global(.ag-theme-quartz-dark .ag-row-even) {
-		background-color: #1a1a1a !important;
+	:global(.native-table tbody tr:nth-child(even) td) {
+		background-color: inherit;
 	}
 
-	:global(.ag-theme-quartz-dark .ag-row-odd) {
-		background-color: #222222 !important;
-	}
-
-	:global(.ag-theme-quartz-dark .ag-row:hover) {
-		background-color: #333333 !important;
-	}
-
-	:global(.ag-theme-quartz-dark .ag-icon) {
-		color: #ffffff !important;
-	}
-
-	/* Fix filter and menu icons */
-	:global(.ag-theme-quartz-dark .ag-header-cell-menu-button) {
-		color: #ffffff !important;
-	}
-
-	:global(.ag-theme-quartz-dark .ag-filter-toolpanel-search) {
-		background-color: #2d2d2d !important;
-		color: #ffffff !important;
-		border-color: #444444 !important;
-	}
-	/* Force override any white backgrounds */
-	:global(.ag-theme-quartz-dark .ag-root-wrapper) {
-		background-color: #1a1a1a !important;
-	}
-
-	:global(.ag-theme-quartz-dark .ag-root) {
-		background-color: #1a1a1a !important;
-	}
-
-	:global(.ag-theme-quartz-dark .ag-body-viewport) {
-		background-color: #1a1a1a !important;
-	}
-
-	:global(.ag-theme-quartz-dark .ag-center-cols-container) {
-		background-color: #1a1a1a !important;
-	}
-
-	/* Ensure all text is readable */
-	:global(.ag-theme-quartz-dark .ag-cell-value) {
-		color: #ffffff !important;
-	}
-
-	:global(.ag-theme-quartz-dark .ag-header-cell-text) {
-		color: #ffffff !important;
+	:global(.native-table tbody tr:nth-child(odd) td) {
+		background-color: inherit;
 	}
 
 	.loading-container {
@@ -909,5 +533,24 @@
 
 	.retry-button:hover {
 		background-color: #0958a3;
+	}
+
+	/* Scrollbar styling */
+	.table-content::-webkit-scrollbar {
+		width: 8px;
+		height: 8px;
+	}
+
+	.table-content::-webkit-scrollbar-track {
+		background-color: rgba(0, 0, 0, 0.1);
+	}
+
+	.table-content::-webkit-scrollbar-thumb {
+		background-color: rgba(255, 255, 255, 0.3);
+		border-radius: 4px;
+	}
+
+	.table-content::-webkit-scrollbar-thumb:hover {
+		background-color: rgba(255, 255, 255, 0.5);
 	}
 </style>

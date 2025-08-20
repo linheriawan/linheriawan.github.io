@@ -136,7 +136,7 @@
 
 	function copyMathSource() {
 		navigator.clipboard.writeText(content).then(() => {
-			console.log('Math source copied to clipboard');
+			// console.log('Math source copied to clipboard');
 		}).catch(err => {
 			console.error('Failed to copy math source:', err);
 		});

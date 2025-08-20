@@ -64,7 +64,7 @@
 		const { code } = extractCodeFromMarkdown(content);
 		navigator.clipboard.writeText(code).then(() => {
 			// Could add a toast notification here
-			console.log('Code copied to clipboard');
+			// console.log('Code copied to clipboard');
 		}).catch(err => {
 			console.error('Failed to copy code:', err);
 		});

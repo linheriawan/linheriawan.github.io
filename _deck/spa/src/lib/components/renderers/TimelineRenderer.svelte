@@ -32,8 +32,6 @@
 	// Parse timeline content from various formats
 	function parseTimelineContent(text: string) {
 		const content = extractContent(text);
-		console.log('Raw timeline input:', text.substring(0, 100) + '...');
-		console.log('Extracted timeline content:', content);
 		
 		try {
 			// Try JSON format first
@@ -141,67 +139,8 @@
 		}
 	}
 
-	// Generate sample timeline data
-	function generateSampleData() {
-		const now = new Date();
-		const items = [
-			{
-				id: 1,
-				content: 'Project Started',
-				start: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
-				type: 'point',
-				className: 'milestone'
-			},
-			{
-				id: 2,
-				content: 'Design Phase',
-				start: new Date(now.getTime() - 25 * 24 * 60 * 60 * 1000),
-				end: new Date(now.getTime() - 15 * 24 * 60 * 60 * 1000),
-				type: 'range',
-				className: 'design-phase'
-			},
-			{
-				id: 3,
-				content: 'Development Sprint 1',
-				start: new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000),
-				end: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
-				type: 'range',
-				className: 'development'
-			},
-			{
-				id: 4,
-				content: 'Testing Phase',
-				start: new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000),
-				end: new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000),
-				type: 'range',
-				className: 'testing'
-			},
-			{
-				id: 5,
-				content: 'Deployment',
-				start: new Date(now.getTime() - 1 * 24 * 60 * 60 * 1000),
-				type: 'point',
-				className: 'milestone'
-			},
-			{
-				id: 6,
-				content: 'Future Feature',
-				start: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
-				type: 'point',
-				className: 'future'
-			}
-		];
-
-		return {
-			items,
-			groups: undefined,
-			title: 'Sample Project Timeline',
-			type: 'sample'
-		};
-	}
-
 	async function initializeTimeline() {
-		if (!browser || !timelineContainer) {
+		if (!browser || !timelineContainer || timeline!=null) {
 			isLoading = false;
 			return;
 		}
@@ -212,27 +151,12 @@
 			errorMessage = '';
 			
 			// Clean up any existing content
-			if (timelineContainer) {
-				timelineContainer.innerHTML = '';
-				console.log('Timeline container dimensions:', {
-					width: timelineContainer.offsetWidth,
-					height: timelineContainer.offsetHeight,
-					clientWidth: timelineContainer.clientWidth,
-					clientHeight: timelineContainer.clientHeight
-				});
-			}
+			if (timelineContainer) { timelineContainer.innerHTML = ''; }
 			
 			// Parse the content or use sample data
 			if (content && content.trim()) {
-				console.log('Timeline: parsing content, length:', content.length);
 				timelineData = parseTimelineContent(content);
-			} else {
-				console.log('Timeline: no content provided, using sample data');
-				timelineData = generateSampleData();
 			}
-
-			console.log('Parsed timeline data:', timelineData);
-			console.log('Timeline items count:', timelineData.items.length);
 
 			if (timelineData.items.length === 0) {
 				throw new Error('No timeline items found');
@@ -241,30 +165,22 @@
 			// Add timeout to prevent indefinite loading - reduced to 5 seconds
 			const timeoutPromise = new Promise((_, reject) => {
 				setTimeout(() => {
-					console.log('TIMELINE TIMEOUT - initialization taking too long');
+					console.error('TIMELINE TIMEOUT - initialization taking too long');
 					reject(new Error('Timeline loading timeout (5s)'));
 				}, 5000);
 			});
 
 			const loadPromise = async () => {
 				// Dynamic import vis-timeline
-				console.log('Step 1: Importing vis-timeline...');
 				const { Timeline, DataSet } = await import('vis-timeline/standalone');
-				console.log('Step 2: vis-timeline imported successfully:', { Timeline, DataSet });
-
+				
 				// Import CSS
-				console.log('Step 3: Importing vis-timeline CSS...');
 				await import('vis-timeline/styles/vis-timeline-graph2d.min.css');
-				console.log('Step 4: CSS imported successfully');
-
+				
 				// Create datasets
-				console.log('Step 5: Creating datasets...');
-				console.log('Timeline items to process:', timelineData.items);
 				const items = new DataSet(timelineData.items);
-				console.log('Step 6: Items dataset created:', items);
 				const groups = timelineData.groups ? new DataSet(timelineData.groups) : undefined;
-				console.log('Step 7: Groups dataset created:', groups);
-
+				
 				// Timeline options
 				const options = {
 					width: '100%',
@@ -311,69 +227,41 @@
 				};
 
 				// Create timeline
-				console.log('Creating timeline with container:', timelineContainer);
-				console.log('Items dataset:', items);
-				console.log('Groups dataset:', groups);
-				console.log('Timeline options:', options);
-				
-				console.log('Step 8: Creating timeline instance...');
 				try {
 					timeline = new Timeline(timelineContainer, items, groups, options);
-					console.log('Step 9: Timeline created successfully:', timeline);
 				} catch (timelineError) {
 					console.error('Failed to create timeline:', timelineError);
 					throw timelineError;
 				}
 
-				console.log('Step 10: Adding event listeners...');
 				// Add event listeners
 				timeline.on('select', (properties: any) => {
 					if (properties.items.length > 0) {
 						const selectedId = properties.items[0];
 						const selectedItem = timelineData.items.find(item => item.id === selectedId);
-						if (selectedItem) {
-							console.log('Selected timeline item:', selectedItem);
-						}
 					}
 				});
 
-				console.log('Step 11: Fitting timeline...');
 				// Fit timeline to show all items
 				timeline.fit();
-				console.log('Step 12: Timeline fit and ready - INITIALIZATION COMPLETE');
 			};
-
 			// Race between loading and timeout
 			await Promise.race([loadPromise(), timeoutPromise]);
-
 		} catch (error: any) {
 			console.error('Timeline initialization error:', error);
 			hasError = true;
 			errorMessage = error.message || 'Failed to initialize timeline';
-			initialized = false; // Reset so it can be retried
 			throw error; // Re-throw for the effect's catch handler
 		} finally {
 			isLoading = false;
 		}
 	}
 
-	function zoomIn() {
-		if (timeline) {
-			timeline.zoomIn(0.2);
-		}
-	}
+	function zoomIn() { if (timeline) { timeline.zoomIn(0.2); } }
 
-	function zoomOut() {
-		if (timeline) {
-			timeline.zoomOut(0.2);
-		}
-	}
+	function zoomOut() { if (timeline) { timeline.zoomOut(0.2); } }
 
-	function fitToWindow() {
-		if (timeline) {
-			timeline.fit();
-		}
-	}
+	function fitToWindow() { if (timeline) { timeline.fit(); } }
 
 	function goToToday() {
 		if (timeline) {
@@ -382,24 +270,59 @@
 		}
 	}
 
+	// Check if we have complete timeline content
+	function hasCompleteTimelineContent(text: string): boolean {
+		if (!text || !text.trim()) return false;
+		
+		// Extract timeline code block
+		const codeBlockMatch = text.match(/```timeline\s*([\s\S]*?)\s*```/i);
+		if (!codeBlockMatch) return false;
+		
+		const timelineContent = codeBlockMatch[1].trim();
+		if (!timelineContent) return false;
+		
+		// If it looks like JSON, check if it's complete
+		if (timelineContent.startsWith('{') || timelineContent.startsWith('[')) {
+			try {
+				JSON.parse(timelineContent);
+				return true; // Valid JSON
+			} catch {
+				return false; // Incomplete or invalid JSON
+			}
+		}
+		
+		// For text format, just check if we have non-empty content
+		return timelineContent.length > 0;
+	}
+
 	// Use effect to initialize when container is available
 	$effect(() => {
-		console.log('Timeline effect triggered, content length:', content?.length || 0);
-		console.log('Already initialized:', initialized, 'Timeline exists:', !!timeline);
+		// Stop triggering if already successfully initialized and rendered
+		if (initialized && timeline && !isLoading && !hasError) {
+			return;
+		}
 		
-		// Only initialize if we have all required conditions and haven't initialized yet
-		if (browser && timelineContainer && content && content.trim() && !initialized && !timeline) {
-			console.log('All conditions met, starting timeline initialization');
-			initialized = true; // Set immediately to prevent race conditions
+		// Prevent re-initialization if already in progress or already has timeline
+		if (isLoading || timeline !== null) {
+			return;
+		}
+		
+		// Only initialize when we have complete timeline content and container is ready
+		const hasComplete = hasCompleteTimelineContent(content);
+		
+		if (browser && timelineContainer && hasComplete && !initialized) {
+			initialized = true; // Set immediately to prevent multiple initializations
 			initializeTimeline().catch(error => {
 				console.error('Timeline initialization failed:', error);
-				initialized = false; // Reset on error so it can be retried
+				// Only reset initialized flag if timeline creation actually failed
+				if (timeline === null) {
+					initialized = false;
+				}
 			});
 		}
 		
 		// Cleanup on component destroy
 		return () => {
-			console.log('Timeline cleanup - destroying timeline');
 			if (timeline) {
 				try {
 					timeline.destroy();
@@ -407,8 +330,8 @@
 					console.warn('Error destroying timeline:', e);
 				}
 				timeline = null;
+				initialized = false;
 			}
-			// Don't reset initialized here - let it stay true if successfully initialized
 		};
 	});
 </script>

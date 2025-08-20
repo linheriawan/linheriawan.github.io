@@ -8,19 +8,16 @@ import path from 'path';
 const MOCK_RESPONSES = {
 	'1': 'resp_1.md',      // Mixed content
 	'2': 'resp_2_math.md', // Math formulas
-	'3': 'resp_3_images.md', // Image gallery
-	'4': 'resp_4_tables.md', // Data tables
 	'5': 'resp_5_presentations.md', // Presentations
 	'6': 'resp_6_pdfs.md', // PDF documents
-	'7': 'resp_7_files.md', // File downloads
-	'8': 'resp_8_urls.md'  // URL previews
+	'7': 'resp_7_files.md' // File downloads and URL previews
 };
 
 async function getMockResponse(messageContent) {
 	try {
 		const message = messageContent.trim();
 		
-		// Check if message is a number 1-8
+		// Check if message is a valid mock number
 		let mockFile;
 		if (MOCK_RESPONSES[message]) {
 			mockFile = MOCK_RESPONSES[message];
@@ -132,9 +129,9 @@ export async function POST({ request, url }) {
 	try {
 		const { message, model = 'llama3.2' } = await request.json();
 
-		// Check if message is a number (1-8) for mock responses
+		// Check if message is a valid mock number (1,2,5,6,7) for mock responses
 		const messageStr = message.toString().trim();
-		const isMockNumber = /^[1-8]$/.test(messageStr);
+		const isMockNumber = /^[12567]$/.test(messageStr);
 		
 		// Set up streaming response
 		const stream = new ReadableStream({

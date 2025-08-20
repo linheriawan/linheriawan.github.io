@@ -147,13 +147,13 @@
 			hasError = false;
 			
 			const url = extractUrl(content);
-			console.log('Loading preview for URL:', url);
+			// console.log('Loading preview for URL:', url);
 
 			// Simulate network delay
 			await new Promise(resolve => setTimeout(resolve, 800));
 			
 			previewData = await fetchUrlPreview(url);
-			console.log('Preview data:', previewData);
+			// console.log('Preview data:', previewData);
 
 		} catch (error: any) {
 			console.error('URL preview error:', error);
@@ -173,7 +173,7 @@
 	function copyUrl() {
 		if (previewData.url) {
 			navigator.clipboard.writeText(previewData.url).then(() => {
-				console.log('URL copied to clipboard');
+				// console.log('URL copied to clipboard');
 			}).catch(err => {
 				console.error('Failed to copy URL:', err);
 			});

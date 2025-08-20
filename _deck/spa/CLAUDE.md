@@ -6,24 +6,39 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 # Start development server
-npm run dev
+bun run dev
 
 # Build for production
-npm run build
+bun run build
 
 # Preview production build
-npm run preview
+bun run preview
 
 # Type checking
-npm run check
+bun run check
 
 # Watch mode type checking
-npm run check:watch
+bun run check:watch
 ```
 
 ## Project Architecture
 
 This is a **SvelteKit 5** application with **Svelte 5 runes** that implements a ChatGPT-style UI with advanced content rendering capabilities. The project is configured as a **Single Page Application (SPA)** using the static adapter.
+
+### Overview
+This project is to make ai chat application to have rich rendering capabilities, previous successfull rendering data is when it only need to rendering 1 renderer inside a message bubble. 
+
+To closely mimic the real ai response we use src/mock/*.md file to illustrate how is the response that should be render as one answer. the challange is using $effect will continously triggering renderer initialisation until the message stream is done (received complete message stream).
+
+### Principle
+** DO's **
+- Prioritise goals from overview
+- ask for confirmation before executing plan, get deeper undestranding of what is the priority to solve and is it gonna have impact for other code 
+- consider replacing current file, than try to fix/edit complicated logic on code more than 400 lines
+
+** DONT **
+- make console.log masively so browser debug will be harder (there is repetitive initialiazation with $effect and message stream)
+- leave unused file/old implementation/testing script uncleaned
 
 ### Core Architecture
 
@@ -48,6 +63,20 @@ src/lib/components/
     ├── MarpRenderer.svelte         # Presentation slides
     └── ImageRenderer.svelte        # Image gallery with zoom
 ```
+**Renderer Usage Logic**:
+1. MarkdownRenderer :  Default renderer (fallback if no other renderer is match) for any text with pattern of ```[keyword]\n[data]```
+2. ChartRenderer : Rendering Chart diagram with pattern of ```chart\n[data]```
+3. CodeRenderer : Rendering programming code block, keyword should including: javascript, json, xml, python,typescript,etc
+3. FileRenderer : Rendering File if pattern is ```file\n[data]```
+4. ImageRenderer : Rendering image preview if pattern is ```image\n[data]```
+5. MathRenderer : Rendering Mermaid diagram with pattern of ```math\n[data]``` or `$$...$$`, `$...$`, or LaTeX commands, but need strategy of how to rendering inline or as block
+6. MediaRenderer : Rendering media player if pattern is ```audio\n[data]``` or ```video\n[data]```
+7. MermaidRenderer : Rendering Mermaid diagram with pattern of ```mermaid\n[data]```
+8. PdfRenderer : Rendering image preview if pattern is ```pdf\n[data]```
+9. TableRenderer : Rendering table if pattern is ```table\n[json_data]``` or ```csv\n[csv_data]```
+10. TimelineRenderer : Rendering timeline visualization if pattern is ```timeline\n[data]```
+11. URLPreviewRenderer : Rendering URL if pattern is ```url\n[data]```
+12. MarpRenderer : Rendering as Markdown (goes to markdownrenderer) if pattern is ```marp\n[data]``` (but have show marp button, which will open new window that really rendering marpit)
 
 **Content Detection Logic**: MessageRenderer.svelte contains sophisticated content analysis that:
 - Detects content types using regex patterns
@@ -58,18 +87,21 @@ src/lib/components/
 ### Dependencies by Content Type
 
 **Core Rendering**:
-- `marked` + `dompurify` - Markdown processing with XSS protection
-- `highlight.js` - Code syntax highlighting
-- `katex` - Mathematical formula rendering
+1 `marked` + `dompurify` - Markdown processing with XSS protection
+2 `highlight.js` - Code syntax highlighting
+3 `katex` - Mathematical formula rendering
 
 **Advanced Content**:
-- `mermaid` - Diagram generation
-- `chart.js` + `chartjs-adapter-date-fns` - Data visualization
-- `@marp-team/marp-core` - Presentation slides
-- `photoswipe` - Image viewer with zoom/pan
-- `pdfjs-dist` - PDF document viewer
-- `video.js` - Media playback
-- `vis-timeline` - Timeline visualization
+4 `mermaid` - Diagram generation
+5 `chart.js` + `chartjs-adapter-date-fns` - Data visualization
+6 `@marp-team/marp-core` - Presentation slides
+7 `vis-timeline` - Timeline visualization
+
+8 `photoswipe` - Image viewer with zoom/pan
+9 PDF renderer should use native brower plugin (using iframe to display pdf)
+10 Media playback should use native html5, uninstall video.js from package
+11 Table renderer, should make custom table render, as simple as the way rendering table for MD 
+12 URLPreview, FileRenderer, should be applied using simple logic
 
 ### Routes Structure
 
@@ -83,14 +115,6 @@ src/lib/components/
 - Uses `@sveltejs/adapter-static` for SPA deployment
 - Fallback to `index.html` for client-side routing
 - Svelte 5 runes enabled (`compilerOptions.runes: true`)
-
-**Content Detection Patterns**:
-- Marp: `---\nmarp: true` or `<!-- theme:` or `<!-- paginate:`
-- Charts: `type: (line|bar|pie|doughnut)` with `data:` properties
-- Mermaid: `​```mermaid` code blocks
-- Math: `$$...$$`, `$...$`, or LaTeX commands
-- Code: `​```language` blocks (excluding mermaid/chart/marp)
-- Images: URLs ending in image extensions or base64 data URLs
 
 ### Development Notes
 

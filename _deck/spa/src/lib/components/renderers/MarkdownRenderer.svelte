@@ -9,12 +9,27 @@
 
 	interface Props {
 		content: string;
+		renderingStrategy?: 'realtime' | 'stream-finish';
 	}
 
-	let { content }: Props = $props();
+	let { content, renderingStrategy = 'stream-finish' }: Props = $props();
 	let renderedHtml = $state<string>('');
 	let containerElement: HTMLDivElement;
+
+	// Child Renderer Registry System
+	interface ChildRenderer {
+		id: string;
+		type: 'timeline' | 'chart' | 'mermaid' | 'media' | 'image' | 'pdf' | 'file' | 'url' | 'table';
+		code: string;
+		containerId: string;
+		isComplete: boolean;
+		isInitialized: boolean;
+		component?: any;
+	}
+	
+	let childRenderers = $state<Map<string, ChildRenderer>>(new Map());
 	let mermaidInitialized = false;
+	let isProcessing = false;
 
 	// Configure marked for better security and formatting
 	marked.setOptions({
@@ -26,73 +41,169 @@
 	// Custom renderer for better chat styling
 	const renderer = new marked.Renderer();
 	
-	// Override code block rendering
+	// Check if a code block is complete by looking for closing ```
+	function isCodeBlockComplete(fullContent: string, codeBlockMatch: RegExpMatchArray): boolean {
+		if (!codeBlockMatch) return false;
+		
+		const beforeCodeBlock = fullContent.substring(0, codeBlockMatch.index || 0);
+		const codeBlockStart = codeBlockMatch[0];
+		const afterCodeBlockStart = fullContent.substring((codeBlockMatch.index || 0) + codeBlockStart.length);
+		
+		// Count opening ``` (including the one we found)
+		const openingBlocks = (beforeCodeBlock.match(/```/g) || []).length + 1;
+		// Count closing ``` after our code block
+		const closingBlocks = (afterCodeBlockStart.match(/```/g) || []).length;
+		
+		// Code block is complete if we have a matching closing ```
+		return closingBlocks >= 1 && afterCodeBlockStart.includes('```');
+	}
+
+	// Helper function to register child renderer
+	function registerChildRenderer(type: ChildRenderer['type'], code: string): string {
+		const id = `${type}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+		const containerId = `${id}-container`;
+		
+		// Check if the code block is complete in the full content
+		// Look for complete code blocks: ```type\n[content]\n```
+		const codeBlockPattern = new RegExp(`\`\`\`${type}\\s*([\\s\\S]*?)\`\`\``, 'gi');
+		const matches = [...content.matchAll(codeBlockPattern)];
+		const isBlockComplete = matches.some(match => {
+			const matchContent = match[1].trim();
+			return matchContent === code.trim();
+		});
+		
+		const codeComplete = isCodeComplete(type, code);
+		const isComplete = isBlockComplete && codeComplete;
+		
+		console.log(`Registering ${type} renderer:`, {
+			id,
+			type,
+			codeLength: code.length,
+			isBlockComplete,
+			codeComplete,
+			isComplete
+		});
+		
+		// Register in our system
+		childRenderers.set(id, {
+			id,
+			type,
+			code,
+			containerId,
+			isComplete,
+			isInitialized: false
+		});
+		
+		// Return placeholder HTML
+		return `<div class="renderer-wrapper">
+			<div class="${type}-container" id="${containerId}"></div>
+			<div class="renderer-note">🔧 ${getRendererName(type)} ${isComplete ? '✅' : '⏳'}</div>
+		</div>`;
+	}
+
+	// Check if code is complete for a given type
+	function isCodeComplete(type: ChildRenderer['type'], code: string): boolean {
+		if (!code.trim()) return false;
+		
+		switch (type) {
+			case 'timeline':
+			case 'chart':
+				// For JSON, try to parse - always strict
+				if (code.startsWith('{') || code.startsWith('[')) {
+					try {
+						const parsed = JSON.parse(code);
+						if (type === 'chart') {
+							return parsed.type && parsed.data;
+						}
+						if (type === 'timeline') {
+							return Array.isArray(parsed) || (parsed.items && Array.isArray(parsed.items));
+						}
+						return true;
+					} catch {
+						return false; // Never initialize with incomplete JSON
+					}
+				}
+				// For simple text format, require reasonable length
+				return code.length > 10 && !code.endsWith(',') && !code.endsWith('{');
+			case 'media':
+				// Check for valid media URLs - can be multiple URLs on separate lines
+				const mediaUrls = code.trim().split('\n').map(url => url.trim()).filter(url => url);
+				const isValid = mediaUrls.length > 0 && mediaUrls.every(url => 
+					/^https?:\/\/[^\s]+\.(mp4|webm|mov|avi|mkv|m4v|mp3|wav|ogg|aac|m4a|flac)(\?[^\s]*)?$/i.test(url) ||
+					/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/.test(url)
+				);
+				console.log('Media completion check:', { code, mediaUrls, isValid });
+				return isValid;
+			case 'image':
+				// Check for valid image URLs - can be multiple URLs on separate lines
+				const imageUrls = code.trim().split('\n').map(url => url.trim()).filter(url => url);
+				return imageUrls.length > 0 && imageUrls.every(url => 
+					/^https?:\/\/[^\s]+\.(jpg|jpeg|png|gif|bmp|svg|webp)(\?[^\s]*)?$/i.test(url) ||
+					/^data:image\/[a-zA-Z]+;base64,/.test(url)
+				);
+			case 'table':
+				// Check for valid table/CSV data - must have header and at least one data row
+				const lines = code.trim().split('\n').filter(line => line.trim());
+				if (lines.length < 2) return false; // Need at least header + 1 data row
+				
+				// Check if it looks like CSV (comma-separated) or table (any delimiter)
+				const hasCommas = lines[0].includes(',');
+				const hasDelimiters = lines[0].includes(',') || lines[0].includes('\t') || lines[0].includes('|');
+				return hasDelimiters && lines.every(line => line.trim().length > 0);
+			case 'mermaid':
+				// Strict completion check - must have complete structure
+				const hasBasicStructure = code.includes('graph') || code.includes('flowchart') || code.includes('sequenceDiagram');
+				const hasConnections = code.includes('-->') || code.includes('->');
+				const notIncomplete = !code.endsWith('->') && !code.endsWith('-') && !code.endsWith('{') && !code.endsWith('[');
+				
+				// Must have both structure keywords and connections, and not end incompletely
+				return code.length > 10 && hasBasicStructure && hasConnections && notIncomplete;
+			default:
+				return code.length > 0;
+		}
+	}
+
+	// Get renderer display name
+	function getRendererName(type: ChildRenderer['type']): string {
+		const names = {
+			timeline: 'TimelineRenderer',
+			chart: 'ChartRenderer', 
+			mermaid: 'MermaidRenderer',
+			media: 'MediaRenderer',
+			image: 'ImageRenderer',
+			pdf: 'PDFRenderer',
+			file: 'FileRenderer',
+			url: 'URLPreviewRenderer',
+			table: 'TableRenderer'
+		};
+		return names[type] || 'Renderer';
+	}
+
+	// Override code block rendering with registry system
 	renderer.code = function(code: string, language?: string) {
 		const lang = (language || 'text').toLowerCase();
 		
-		// Helper function to create renderer note
-		function createRendererNote(rendererName: string): string {
-			return `<div class="renderer-note">🔧 ${rendererName}</div>`;
-		}
-		
-		// Special handling for Mermaid diagrams
-		if (lang === 'mermaid') {
-			const id = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-			return `<div class="renderer-wrapper"><div class="mermaid-container" data-mermaid-code="${encodeURIComponent(code)}" id="${id}"></div>${createRendererNote('MermaidRenderer')}</div>`;
-		}
+		// Special renderers using registry system
+		if (lang === 'mermaid') return registerChildRenderer('mermaid', code);
+		if (lang === 'chart') return registerChildRenderer('chart', code);
+		if (lang === 'audio' || lang === 'video') return registerChildRenderer('media', code);
+		if (lang === 'timeline') return registerChildRenderer('timeline', code);
+		if (lang === 'table') return registerChildRenderer('table', code);
+		if (lang === 'csv') return registerChildRenderer('table', code); // CSV uses table renderer
+		if (lang === 'image') return registerChildRenderer('image', code);
+		if (lang === 'pdf') return registerChildRenderer('pdf', code);
+		if (lang === 'file') return registerChildRenderer('file', code);
+		if (lang === 'url') return registerChildRenderer('url', code);
 
-		// Special handling for Charts
-		if (lang === 'chart') {
-			const id = `chart-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-			return `<div class="renderer-wrapper"><div class="chart-container" data-chart-code="${encodeURIComponent(code)}" id="${id}"></div>${createRendererNote('ChartRenderer')}</div>`;
-		}
-
-		// Special handling for Marp presentations - show as markdown with button
+		// Marp is special - stays in markdown  
 		if (lang === 'marp') {
-			const id = `marp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-			return `<div class="renderer-wrapper"><div class="marp-simple-container" data-marp-code="${encodeURIComponent(code)}" id="${id}"></div>${createRendererNote('MarpRenderer (Presentation)')}</div>`;
-		}
-
-		// Special handling for Media (audio/video)
-		if (lang === 'audio' || lang === 'video') {
-			const id = `media-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-			return `<div class="renderer-wrapper"><div class="media-container" data-media-code="${encodeURIComponent(code)}" data-media-type="${lang}" id="${id}"></div>${createRendererNote('MediaRenderer (' + lang.charAt(0).toUpperCase() + lang.slice(1) + ')')}</div>`;
-		}
-
-		// Special handling for Timeline
-		if (lang === 'timeline') {
-			const id = `timeline-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-			return `<div class="renderer-wrapper"><div class="timeline-container" data-timeline-code="${encodeURIComponent(code)}" id="${id}"></div>${createRendererNote('TimelineRenderer')}</div>`;
-		}
-
-		// Special handling for Tables
-		if (lang === 'table' || lang === 'csv') {
-			const id = `table-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-			return `<div class="renderer-wrapper"><div class="table-container" data-table-code="${encodeURIComponent(code)}" id="${id}"></div>${createRendererNote('TableRenderer')}</div>`;
-		}
-
-		// Special handling for Images
-		if (lang === 'image') {
-			const id = `image-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-			return `<div class="renderer-wrapper"><div class="image-container" data-image-code="${encodeURIComponent(code)}" id="${id}"></div>${createRendererNote('ImageRenderer')}</div>`;
-		}
-
-		// Special handling for PDF
-		if (lang === 'pdf') {
-			const id = `pdf-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-			return `<div class="renderer-wrapper"><div class="pdf-container" data-pdf-code="${encodeURIComponent(code)}" id="${id}"></div>${createRendererNote('PDFRenderer')}</div>`;
-		}
-
-		// Special handling for Files
-		if (lang === 'file') {
-			const id = `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-			return `<div class="renderer-wrapper"><div class="file-container" data-file-code="${encodeURIComponent(code)}" id="${id}"></div>${createRendererNote('FileRenderer')}</div>`;
-		}
-
-		// Special handling for URL Preview
-		if (lang === 'url') {
-			const id = `url-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-			return `<div class="renderer-wrapper"><div class="url-container" data-url-code="${encodeURIComponent(code)}" id="${id}"></div>${createRendererNote('URLPreviewRenderer')}</div>`;
+			return `<div class="marp-content" style="background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0;">
+				<div class="marp-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+					<span style="font-size: 0.8rem; color: #666;">📊 Marp Presentation</span>
+					<button onclick="alert('Marp functionality not implemented yet')" style="padding: 0.25rem 0.5rem; font-size: 0.7rem; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer;">Open Presentation</button>
+				</div>
+				<pre style="margin: 0; font-size: 0.8rem; color: #666; white-space: pre-wrap; overflow-x: auto;">${code}</pre>
+			</div>`;
 		}
 		
 		// Default: Syntax highlighting for code blocks (CodeRenderer)
@@ -109,7 +220,7 @@
 		}
 		
 		// Add renderer note for code blocks
-		const codeRendererNote = createRendererNote(`CodeRenderer (${lang || 'auto-detect'})`);
+		const codeRendererNote = `<div class="renderer-note">🔧 CodeRenderer (${lang || 'auto-detect'})</div>`;
 		return `<div class="code-block-wrapper"><pre class="code-block"><code class="language-${lang}">${highlightedCode}</code></pre>${codeRendererNote}</div>`;
 	};
 
@@ -117,6 +228,137 @@
 	renderer.codespan = function(code: string) {
 		return `<code class="inline-code">${code}</code>`;
 	};
+
+	// Registry Processing System - Clean Implementation
+	async function processChildRenderers() {
+		if (!browser || !containerElement || isProcessing) return;
+		
+		console.log('Processing child renderers...', {
+			rendererCount: childRenderers.size,
+			containerElement: !!containerElement
+		});
+		
+		isProcessing = true;
+		try {
+			// Import components once
+			const components = await importRendererComponents();
+			if (!components) {
+				console.error('Failed to import components, aborting renderer processing');
+				return;
+			}
+
+			// Process each registered child renderer
+			for (const [id, renderer] of childRenderers.entries()) {
+				console.log(`Processing renderer ${id}:`, {
+					type: renderer.type,
+					isInitialized: renderer.isInitialized,
+					isComplete: renderer.isComplete,
+					containerId: renderer.containerId
+				});
+				
+				// Skip if already initialized
+				if (renderer.isInitialized) continue;
+				
+				// Re-check completion status for streaming content
+				if (!renderer.isComplete) {
+					// Check if the code block is now complete in the full content
+					const codeBlockPattern = new RegExp(`\`\`\`${renderer.type}\\s*([\\s\\S]*?)\`\`\``, 'gi');
+					const matches = [...content.matchAll(codeBlockPattern)];
+					const isBlockComplete = matches.some(match => {
+						const matchContent = match[1].trim();
+						return matchContent === renderer.code.trim();
+					});
+					
+					const codeComplete = isCodeComplete(renderer.type, renderer.code);
+					renderer.isComplete = isBlockComplete && codeComplete;
+					
+					console.log(`Re-checked completion for ${id}:`, {
+						isBlockComplete,
+						codeComplete,
+						isComplete: renderer.isComplete
+					});
+					
+					if (!renderer.isComplete) continue;
+				}
+
+				// Find the container
+				const container = containerElement.querySelector(`#${renderer.containerId}`);
+				console.log(`Looking for container ${renderer.containerId}:`, !!container);
+				if (!container) continue;
+
+				// Initialize the renderer
+				try {
+					const { mount } = await import('svelte');
+					const componentClass = getRendererComponent(components, renderer.type);
+					
+					console.log(`Mounting ${renderer.type} component:`, !!componentClass);
+					
+					if (componentClass && !renderer.component) {
+						const formattedContent = formatContentForRenderer(renderer);
+						
+						console.log(`Formatted content for ${renderer.type}:`, formattedContent);
+						
+						renderer.component = mount(componentClass, {
+							target: container,
+							props: {
+								content: formattedContent,
+								renderingStrategy
+							}
+						});
+						
+						// Mark as initialized
+						renderer.isInitialized = true;
+						console.log(`Successfully mounted ${renderer.type} renderer`);
+					}
+				} catch (error) {
+					console.error(`Error initializing ${renderer.type} renderer:`, error);
+				}
+			}
+		} finally {
+			isProcessing = false;
+		}
+	}
+
+
+	// Get the appropriate renderer component
+	function getRendererComponent(components: any, type: ChildRenderer['type']) {
+		const componentMap = {
+			timeline: components.TimelineRenderer,
+			chart: components.ChartRenderer,
+			mermaid: components.MermaidRenderer,
+			media: components.MediaRenderer,
+			image: components.ImageRenderer,
+			pdf: components.PDFRenderer,
+			file: components.FileRenderer,
+			url: components.URLPreviewRenderer,
+			table: components.TableRenderer
+		};
+		return componentMap[type];
+	}
+
+	// Format content for specific renderer
+	function formatContentForRenderer(renderer: ChildRenderer): string {
+		switch (renderer.type) {
+			case 'timeline':
+				return `\`\`\`timeline\n${renderer.code}\n\`\`\``;
+			case 'chart':
+				return `\`\`\`chart\n${renderer.code}\n\`\`\``;
+			case 'media':
+				// Detect if it's audio or video based on URL/extension
+				const isAudio = /\.(mp3|wav|ogg|aac|m4a|flac)(\?[^\s]*)?$/i.test(renderer.code.trim());
+				const mediaType = isAudio ? 'audio' : 'video';
+				return `\`\`\`${mediaType}\n${renderer.code}\n\`\`\``;
+			case 'mermaid':
+				return `\`\`\`mermaid\n${renderer.code}\n\`\`\``;
+			case 'table':
+				// For table renderer, check if original was CSV and preserve that
+				const hasCommas = renderer.code.includes(',');
+				const originalType = hasCommas ? 'csv' : 'table';
+				return `\`\`\`${originalType}\n${renderer.code}\n\`\`\``;
+			default:
+				return `\`\`\`${renderer.type}\n${renderer.code}\n\`\`\``;
+		}
+	}
 
 	// Override link rendering for security
 	renderer.link = function(href: string, title: string | null, text: string) {
@@ -204,587 +446,47 @@
 		mermaidInitialized = true;
 	}
 
-	// Render mermaid diagrams in the DOM - only when complete
-	async function renderMermaidDiagrams() {
-		if (!browser || !containerElement) return;
-
-		const mermaidContainers = containerElement.querySelectorAll('.mermaid-container:not([data-processed])');
-		
-		for (const container of mermaidContainers) {
-			const mermaidCode = decodeURIComponent(container.getAttribute('data-mermaid-code') || '');
-			const id = container.id;
-
-			if (!mermaidCode.trim()) continue;
-
-			// Check if the mermaid code block is complete (avoid streaming issues)
-			const parentText = containerElement.textContent || '';
-			const codeBlockStart = parentText.indexOf('```mermaid');
-			const codeBlockEnd = parentText.indexOf('```', codeBlockStart + 10);
-			
-			// Only process if we have a complete code block
-			if (codeBlockStart === -1 || codeBlockEnd === -1) {
-				continue;
-			}
-
-			try {
-				// Mark as being processed
-				container.setAttribute('data-processed', 'true');
-				
-				// Generate unique ID for mermaid render to avoid conflicts
-				const renderID = 'mermaid-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
-				const { svg } = await mermaid.render(renderID, mermaidCode);
-				
-				// Set the SVG content and prevent further processing
-				container.innerHTML = svg;
-				container.removeAttribute('data-mermaid-code'); // Prevent re-processing
-				
-				// Apply styling
-				container.style.textAlign = 'center';
-				container.style.padding = '1rem';
-				container.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
-				container.style.borderRadius = '8px 8px 0 0';
-				container.style.margin = '0';
-			} catch (error) {
-				console.error('Mermaid rendering error:', error);
-				container.innerHTML = `<div style="color: #ff7b72; padding: 1rem; background: rgba(255,123,114,0.1); border-radius: 6px;">
-					<strong>Mermaid Error:</strong><br>
-					<pre style="margin: 0.5rem 0; font-size: 0.8rem;">${mermaidCode}</pre>
-				</div>`;
-			}
-		}
-	}
-
-	// Render chart containers in the DOM
-	async function renderChartContainers() {
-		if (!browser || !containerElement) return;
-
-		const chartContainers = containerElement.querySelectorAll('.chart-container');
-		
-		for (const container of chartContainers) {
-			const chartCode = decodeURIComponent(container.getAttribute('data-chart-code') || '');
-			
-			if (!chartCode.trim()) continue;
-
-			try {
-				// Parse chart data
-				const cleanCode = chartCode.replace(/```chart\s*\n?|\n?```$/g, '').trim();
-				let chartConfig: any;
-				
-				try {
-					chartConfig = JSON.parse(cleanCode);
-				} catch {
-					// Try simple format
-					const lines = cleanCode.split('\n').filter(line => line.trim());
-					if (lines.length < 2) throw new Error('Invalid chart format');
-					
-					const typeMatch = lines[0].match(/^type:\s*(\w+)/i);
-					if (!typeMatch) throw new Error('Chart type not specified');
-					
-					const type = typeMatch[1].toLowerCase();
-					const labels: string[] = [];
-					const values: number[] = [];
-					
-					for (const line of lines.slice(1)) {
-						const match = line.match(/^([^:]+):\s*(.+)$/);
-						if (match) {
-							labels.push(match[1].trim());
-							const value = parseFloat(match[2].trim());
-							if (!isNaN(value)) values.push(value);
-						}
-					}
-					
-					chartConfig = {
-						type,
-						data: {
-							labels,
-							datasets: [{
-								label: 'Data',
-								data: values,
-								backgroundColor: [
-									'rgba(255, 99, 132, 0.6)',
-									'rgba(54, 162, 235, 0.6)',
-									'rgba(255, 205, 86, 0.6)',
-									'rgba(75, 192, 192, 0.6)',
-									'rgba(153, 102, 255, 0.6)'
-								]
-							}]
-						}
-					};
-				}
-
-				// Create canvas and render chart
-				const canvas = document.createElement('canvas');
-				canvas.style.width = '100%';
-				canvas.style.height = '300px';
-				
-				container.innerHTML = '';
-				container.appendChild(canvas);
-				container.style.padding = '1rem';
-				container.style.backgroundColor = 'rgba(0, 0, 0, 0.1)';
-				container.style.borderRadius = '8px 8px 0 0';
-				container.style.margin = '0';
-
-				// Import Chart.js dynamically with all necessary components
-				const chartJS = await import('chart.js');
-				const { Chart, registerables } = chartJS;
-				
-				// Register all Chart.js components
-				Chart.register(...registerables);
-				
-				const chart = new Chart(canvas, {
-					type: chartConfig.type || 'bar',
-					data: chartConfig.data,
-					options: {
-						responsive: true,
-						maintainAspectRatio: false,
-						plugins: {
-							legend: { labels: { color: '#ffffff' } },
-							title: { color: '#ffffff' }
-						},
-						scales: chartConfig.type === 'pie' || chartConfig.type === 'doughnut' ? {} : {
-							x: {
-								ticks: { color: '#ffffff' },
-								grid: { color: 'rgba(255, 255, 255, 0.1)' }
-							},
-							y: {
-								ticks: { color: '#ffffff' },
-								grid: { color: 'rgba(255, 255, 255, 0.1)' }
-							}
-						}
-					}
-				});
-				
-			} catch (error) {
-				console.error('Chart rendering error:', error);
-				container.innerHTML = `<div style="color: #ff7b72; padding: 1rem; background: rgba(255,123,114,0.1); border-radius: 6px;">
-					<strong>Chart Error:</strong> ${error.message}<br>
-					<pre style="margin: 0.5rem 0; font-size: 0.8rem;">${chartCode}</pre>
-				</div>`;
-			}
-		}
-	}
-
-	// Simple Marp containers - render as markdown with "Show as Marp" button
-	async function renderMarpContainers() {
-		if (!browser || !containerElement) return;
-
-		const marpContainers = containerElement.querySelectorAll('.marp-simple-container');
-		
-		for (const container of marpContainers) {
-			const marpCode = decodeURIComponent(container.getAttribute('data-marp-code') || '');
-			
-			if (!marpCode.trim()) continue;
-
-			try {
-				// Clean the Marp code and remove directives for markdown display
-				let cleanCode = marpCode.replace(/```marp\s*\n?|\n?```$/g, '').trim();
-				cleanCode = cleanCode.replace(/^---[\s\S]*?---\s*/m, ''); // Remove frontmatter
-				
-				// Render as markdown
-				const markdownHtml = await renderMarkdown(cleanCode);
-				
-				// Create simple container with markdown preview and button
-				container.innerHTML = `
-					<div class="marp-simple-preview" style="
-						border: 1px solid rgba(255, 255, 255, 0.2);
-						border-radius: 8px 8px 0 0;
-						overflow: hidden;
-						background: rgba(0, 0, 0, 0.1);
-						margin: 0;
-					">
-						<!-- Header with Marp label and button -->
-						<div class="marp-header" style="
-							display: flex;
-							justify-content: space-between;
-							align-items: center;
-							padding: 0.6rem 0.8rem;
-							background-color: rgba(0, 0, 0, 0.3);
-							border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-						">
-							<span style="
-								color: #a0a0a0;
-								font-family: Monaco, Menlo, 'Ubuntu Mono', monospace;
-								text-transform: uppercase;
-								font-weight: 600;
-								font-size: 0.7rem;
-								letter-spacing: 0.5px;
-							">Marp Presentation</span>
-							<button onclick="openMarpPresentation('${container.id}')" style="
-								background: #0b69a3;
-								border: none;
-								color: white;
-								cursor: pointer;
-								padding: 0.5rem 1rem;
-								border-radius: 4px;
-								font-size: 0.8rem;
-								font-weight: 500;
-								transition: background 0.2s ease;
-							" title="Open presentation in fullscreen" onmouseover="this.style.backgroundColor='#085a8a'" onmouseout="this.style.backgroundColor='#0b69a3'">
-								📽️ Show as Marp
-							</button>
-						</div>
-						
-						<!-- Markdown Preview -->
-						<div class="marp-markdown-preview" style="
-							padding: 1rem;
-							max-height: 200px;
-							overflow-y: auto;
-						">
-							${markdownHtml}
-						</div>
-					</div>
-				`;
-				
-				// Store the original source code for the button
-				container.setAttribute('data-marp-source', encodeURIComponent(marpCode));
-				
-			} catch (error) {
-				console.error('Marp preview error:', error);
-				container.innerHTML = `<div style="color: #ff7b72; padding: 1rem; background: rgba(255,123,114,0.1); border-radius: 6px;">
-					<strong>Marp Preview Error:</strong> ${error.message}<br>
-					<pre style="margin: 0.5rem 0; font-size: 0.8rem;">${marpCode}</pre>
-				</div>`;
-			}
-		}
-	}
-
 	// Import renderer components dynamically
 	async function importRendererComponents() {
-		if (browser) {
-			const [
-				{ default: MediaRenderer },
-				{ default: TimelineRenderer },
-				{ default: TableRenderer },
-				{ default: ImageRenderer },
-				{ default: PDFRenderer },
-				{ default: FileRenderer },
-				{ default: URLPreviewRenderer }
-			] = await Promise.all([
-				import('./MediaRenderer.svelte'),
+		try {
+			console.log('Importing renderer components...');
+			const components = await Promise.all([
 				import('./TimelineRenderer.svelte'),
-				import('./TableRenderer.svelte'),
+				import('./ChartRenderer.svelte'), 
+				import('./MermaidRenderer.svelte'),
+				import('./MediaRenderer.svelte'),
 				import('./ImageRenderer.svelte'),
 				import('./PDFRenderer.svelte'),
 				import('./FileRenderer.svelte'),
-				import('./URLPreviewRenderer.svelte')
+				import('./URLPreviewRenderer.svelte'),
+				import('./TableRenderer.svelte')
 			]);
-			
+
+			console.log('Components imported successfully:', components);
 			return {
-				MediaRenderer,
-				TimelineRenderer,
-				TableRenderer,
-				ImageRenderer,
-				PDFRenderer,
-				FileRenderer,
-				URLPreviewRenderer
+				TimelineRenderer: components[0].default,
+				ChartRenderer: components[1].default,
+				MermaidRenderer: components[2].default,
+				MediaRenderer: components[3].default,
+				ImageRenderer: components[4].default,
+				PDFRenderer: components[5].default,
+				FileRenderer: components[6].default,
+				URLPreviewRenderer: components[7].default,
+				TableRenderer: components[8].default
 			};
-		}
-		return null;
-	}
-
-	// Check if a code block is complete during streaming
-	function isCodeBlockComplete(containerElement: Element, blockType: string): boolean {
-		const parentText = containerElement.textContent || '';
-		const blockStart = parentText.indexOf(`\`\`\`${blockType}`);
-		const blockEnd = parentText.indexOf('```', blockStart + blockType.length + 3);
-		return blockStart !== -1 && blockEnd !== -1;
-	}
-
-	// Render media containers (audio/video) in the DOM - only when complete
-	async function renderMediaContainers() {
-		if (!browser || !containerElement) return;
-
-		const mediaContainers = containerElement.querySelectorAll('.media-container:not([data-processed])');
-		
-		if (mediaContainers.length === 0) return;
-		
-		try {
-			const components = await importRendererComponents();
-			if (!components) return;
-			
-			for (const container of mediaContainers) {
-				const mediaCode = decodeURIComponent(container.getAttribute('data-media-code') || '');
-				const mediaType = container.getAttribute('data-media-type') || '';
-				
-				if (!mediaCode.trim()) continue;
-
-				// Only process complete code blocks
-				if (!isCodeBlockComplete(containerElement, mediaType)) {
-					continue;
-				}
-				
-				// Mark as processed
-				container.setAttribute('data-processed', 'true');
-				
-				// Create Svelte component instance using Svelte 5 mount
-				const { mount: mountMedia } = await import('svelte');
-				mountMedia(components.MediaRenderer, {
-					target: container,
-					props: {
-						content: `\`\`\`${mediaType}\n${mediaCode}\n\`\`\``
-					}
-				});
-				
-				container.removeAttribute('data-media-code');
-			}
 		} catch (error) {
-			console.error('Media rendering error:', error);
+			console.error('Failed to import renderer components:', error);
+			return null;
 		}
 	}
 
-	// Render timeline containers in the DOM - only when complete
-	async function renderTimelineContainers() {
-		if (!browser || !containerElement) return;
-
-		const timelineContainers = containerElement.querySelectorAll('.timeline-container:not([data-processed])');
-		
-		if (timelineContainers.length === 0) return;
-		
-		try {
-			const components = await importRendererComponents();
-			if (!components) return;
-			
-			for (const container of timelineContainers) {
-				const timelineCode = decodeURIComponent(container.getAttribute('data-timeline-code') || '');
-				
-				if (!timelineCode.trim()) continue;
-
-				// Debug: Check if timeline code is available
-				console.log('Processing timeline with code:', timelineCode.substring(0, 50) + '...');
-				
-				// Re-enabled timeline processing with improved initialization logic
-				console.log('Timeline processing enabled - testing improved initialization');
-				
-				// Mark as processed
-				container.setAttribute('data-processed', 'true');
-				
-				// Create Svelte component instance using Svelte 5 mount
-				const { mount } = await import('svelte');
-				mount(components.TimelineRenderer, {
-					target: container,
-					props: {
-						content: `\`\`\`timeline\n${timelineCode}\n\`\`\``
-					}
-				});
-				
-				container.removeAttribute('data-timeline-code');
-			}
-		} catch (error) {
-			console.error('Timeline rendering error:', error);
-		}
-	}
-
-	// Render table containers in the DOM - only when complete
-	async function renderTableContainers() {
-		if (!browser || !containerElement) return;
-
-		const tableContainers = containerElement.querySelectorAll('.table-container:not([data-processed])');
-		
-		if (tableContainers.length === 0) return;
-		
-		try {
-			const components = await importRendererComponents();
-			if (!components) return;
-			
-			for (const container of tableContainers) {
-				const tableCode = decodeURIComponent(container.getAttribute('data-table-code') || '');
-				
-				if (!tableCode.trim()) continue;
-
-				// Only process complete code blocks
-				if (!isCodeBlockComplete(containerElement, 'table') && !isCodeBlockComplete(containerElement, 'csv')) {
-					continue;
-				}
-				
-				// Mark as processed
-				container.setAttribute('data-processed', 'true');
-				
-				// Create Svelte component instance using Svelte 5 mount
-				const { mount: mountTable } = await import('svelte');
-				mountTable(components.TableRenderer, {
-					target: container,
-					props: {
-						content: `\`\`\`csv\n${tableCode}\n\`\`\``
-					}
-				});
-				
-				container.removeAttribute('data-table-code');
-			}
-		} catch (error) {
-			console.error('Table rendering error:', error);
-		}
-	}
-
-	// Render image containers in the DOM - only when complete
-	async function renderImageContainers() {
-		if (!browser || !containerElement) return;
-
-		const imageContainers = containerElement.querySelectorAll('.image-container:not([data-processed])');
-		
-		if (imageContainers.length === 0) return;
-		
-		try {
-			const components = await importRendererComponents();
-			if (!components) return;
-			
-			for (const container of imageContainers) {
-				const imageCode = decodeURIComponent(container.getAttribute('data-image-code') || '');
-				
-				if (!imageCode.trim()) continue;
-
-				// Only process complete code blocks
-				if (!isCodeBlockComplete(containerElement, 'image')) {
-					continue;
-				}
-				
-				// Mark as processed
-				container.setAttribute('data-processed', 'true');
-				
-				// Create Svelte component instance using Svelte 5 mount
-				const { mount: mountImage } = await import('svelte');
-				mountImage(components.ImageRenderer, {
-					target: container,
-					props: {
-						content: `\`\`\`image\n${imageCode}\n\`\`\``
-					}
-				});
-				
-				container.removeAttribute('data-image-code');
-			}
-		} catch (error) {
-			console.error('Image rendering error:', error);
-		}
-	}
-
-	// Render PDF containers in the DOM - only when complete
-	async function renderPDFContainers() {
-		if (!browser || !containerElement) return;
-
-		const pdfContainers = containerElement.querySelectorAll('.pdf-container:not([data-processed])');
-		
-		if (pdfContainers.length === 0) return;
-		
-		try {
-			const components = await importRendererComponents();
-			if (!components) return;
-			
-			for (const container of pdfContainers) {
-				const pdfCode = decodeURIComponent(container.getAttribute('data-pdf-code') || '');
-				
-				if (!pdfCode.trim()) continue;
-
-				// Only process complete code blocks
-				if (!isCodeBlockComplete(containerElement, 'pdf')) {
-					continue;
-				}
-				
-				// Mark as processed
-				container.setAttribute('data-processed', 'true');
-				
-				// Create Svelte component instance using Svelte 5 mount
-				const { mount: mountPDF } = await import('svelte');
-				mountPDF(components.PDFRenderer, {
-					target: container,
-					props: {
-						content: `\`\`\`pdf\n${pdfCode}\n\`\`\``
-					}
-				});
-				
-				container.removeAttribute('data-pdf-code');
-			}
-		} catch (error) {
-			console.error('PDF rendering error:', error);
-		}
-	}
-
-	// Render file containers in the DOM - only when complete
-	async function renderFileContainers() {
-		if (!browser || !containerElement) return;
-
-		const fileContainers = containerElement.querySelectorAll('.file-container:not([data-processed])');
-		
-		if (fileContainers.length === 0) return;
-		
-		try {
-			const components = await importRendererComponents();
-			if (!components) return;
-			
-			for (const container of fileContainers) {
-				const fileCode = decodeURIComponent(container.getAttribute('data-file-code') || '');
-				
-				if (!fileCode.trim()) continue;
-
-				// Only process complete code blocks
-				if (!isCodeBlockComplete(containerElement, 'file')) {
-					continue;
-				}
-				
-				// Mark as processed
-				container.setAttribute('data-processed', 'true');
-				
-				// Create Svelte component instance using Svelte 5 mount
-				const { mount: mountFile } = await import('svelte');
-				mountFile(components.FileRenderer, {
-					target: container,
-					props: {
-						content: `\`\`\`file\n${fileCode}\n\`\`\``
-					}
-				});
-				
-				container.removeAttribute('data-file-code');
-			}
-		} catch (error) {
-			console.error('File rendering error:', error);
-		}
-	}
-
-	// Render URL containers in the DOM - only when complete
-	async function renderURLContainers() {
-		if (!browser || !containerElement) return;
-
-		const urlContainers = containerElement.querySelectorAll('.url-container:not([data-processed])');
-		
-		if (urlContainers.length === 0) return;
-		
-		try {
-			const components = await importRendererComponents();
-			if (!components) return;
-			
-			for (const container of urlContainers) {
-				const urlCode = decodeURIComponent(container.getAttribute('data-url-code') || '');
-				
-				if (!urlCode.trim()) continue;
-
-				// Only process complete code blocks
-				if (!isCodeBlockComplete(containerElement, 'url')) {
-					continue;
-				}
-				
-				// Mark as processed
-				container.setAttribute('data-processed', 'true');
-				
-				// Create Svelte component instance using Svelte 5 mount
-				const { mount: mountURL } = await import('svelte');
-				mountURL(components.URLPreviewRenderer, {
-					target: container,
-					props: {
-						content: `\`\`\`url\n${urlCode}\n\`\`\``
-					}
-				});
-				
-				container.removeAttribute('data-url-code');
-			}
-		} catch (error) {
-			console.error('URL rendering error:', error);
-		}
-	}
-
+	// Clean markdown rendering with registry system
 	async function renderMarkdown(text: string): Promise<string> {
 		try {
 			// First, process math formulas
 			const textWithMath = processMathFormulas(text);
 			
-			// Parse markdown to HTML
+			// Parse markdown to HTML (this will register child renderers)
 			const html = await marked.parse(textWithMath);
 			
 			// Sanitize HTML to prevent XSS
@@ -794,19 +496,16 @@
 					'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
 					'ul', 'ol', 'li', 'blockquote',
 					'a', 'img', 'table', 'thead', 'tbody', 'tr', 'td', 'th',
-					'hr', 'div', 'span', 'math', 'semantics', 'mrow', 'mi', 'mn', 'mo'
+					'hr', 'div', 'span', 'math', 'semantics', 'mrow', 'mi', 'mn', 'mo',
+					'button' // For Marp presentation buttons
 				],
-				ALLOWED_ATTR: [
-					'href', 'target', 'rel', 'title', 'alt', 'src',
-					'class', 'id', 'style', 'data-mermaid-code', 'data-chart-code', 'data-marp-code', 
-					'data-chart-content', 'data-marp-content', 'data-rendered', 'aria-hidden'
-				],
-				ALLOWED_URI_REGEXP: /^(?:(?:(?:f|ht)tps?|mailto|tel|callto|cid|xmpp|data):|[^a-z]|[a-z+.\-]+(?:[^a-z+.\-:]|$))/i
+				ALLOWED_ATTR: ['href', 'target', 'rel', 'title', 'alt', 'src', 'class', 'id', 'style', 'onclick'],
+				ALLOWED_SCHEMES: ['http', 'https', 'data']
 			});
-
+			
 			return cleanHtml;
 		} catch (error) {
-			console.error('Markdown rendering error:', error);
+			console.error('Error parsing markdown:', error);
 			return `<p>Error rendering markdown: ${text}</p>`;
 		}
 	}
@@ -814,27 +513,40 @@
 	let isRendering = false;
 	let lastContent = '';
 
+	// New clean render function using registry system
 	async function renderContent() {
-		if (!browser || isRendering || content === lastContent) return;
+		if (!browser || isRendering) return;
+		
+		// For streaming content, don't reset registry on every change
+		// Only reset if content is significantly different (new conversation)
+		if (content !== lastContent) {
+			const isNewContent = lastContent === '' || 
+								 content.length < lastContent.length || 
+								 !content.startsWith(lastContent.substring(0, Math.min(50, lastContent.length)));
+			
+			if (isNewContent) {
+				// Clear registry and force re-render for new content
+				childRenderers.clear();
+				isProcessing = false;
+				renderedHtml = '';
+			}
+		}
+		
+		if (content === lastContent) return;
 		
 		isRendering = true;
 		lastContent = content;
 		
 		try {
-			initializeMermaid();
+			// Render markdown (which registers child renderers)
 			renderedHtml = await renderMarkdown(content);
-			// Use nextTick equivalent to ensure DOM is updated
-			await new Promise(resolve => setTimeout(resolve, 0));
-			await renderMermaidDiagrams();
-			await renderChartContainers();
-			await renderMarpContainers();
-			await renderMediaContainers();
-			await renderTimelineContainers();
-			await renderTableContainers();
-			await renderImageContainers();
-			await renderPDFContainers();
-			await renderFileContainers();
-			await renderURLContainers();
+			
+			// Wait for DOM update
+			await new Promise(resolve => setTimeout(resolve, 10));
+			
+			// Process registered child renderers
+			await processChildRenderers();
+			
 		} catch (error) {
 			console.error('Render error:', error);
 		} finally {
@@ -842,31 +554,8 @@
 		}
 	}
 
-	// Simple global function for opening Marp presentations
-	function setupGlobalMarpFunctions() {
-		if (!browser) return;
-
-		// @ts-ignore
-		window.openMarpPresentation = (containerId: string) => {
-			const container = document.getElementById(containerId);
-			if (!container) return;
-			
-			const source = decodeURIComponent(container.getAttribute('data-marp-source') || '');
-			if (!source) return;
-			
-			// Store source in session storage instead of URL
-			const presentationId = `marp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-			sessionStorage.setItem(presentationId, source);
-			
-			// Open presentation with just the ID
-			const presentationUrl = `/presentation?id=${presentationId}`;
-			window.open(presentationUrl, '_blank');
-		};
-	}
-
 	onMount(() => {
 		if (browser) {
-			setupGlobalMarpFunctions();
 			renderContent();
 		}
 	});

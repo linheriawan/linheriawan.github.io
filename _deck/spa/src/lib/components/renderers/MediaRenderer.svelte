@@ -6,15 +6,16 @@
 	}
 
 	let { content }: Props = $props();
-	let mediaContainer: HTMLDivElement;
+	let mediaContainer = $state<HTMLDivElement>();
 	let isLoading = $state<boolean>(true);
 	let hasError = $state<boolean>(false);
 	let errorMessage = $state<string>('');
-	let player: any = null;
+	let player = $state<any>(null);
 	let mediaType = $state<'video' | 'audio'>('video');
 	let mediaUrl = $state<string>('');
 	let mediaTitle = $state<string>('');
 	let initialized = $state<boolean>(false);
+	let currentContent = $state<string>('');
 
 	// Extract content from code blocks
 	function extractContent(text: string): string {
@@ -28,9 +29,7 @@
 
 	// Extract media URL and determine type from content
 	function extractMediaInfo(text: string): { url: string; type: 'video' | 'audio'; title?: string } {
-		console.log('Raw input text:', text);
 		const content = extractContent(text);
-		console.log('Extracted content:', content);
 		const trimmed = content;
 		
 		// Direct media URL
@@ -81,12 +80,16 @@
 	}
 
 	async function initializePlayer() {
+		console.log('MediaRenderer: initializePlayer called', { browser, mediaContainer: !!mediaContainer, content });
+		
 		if (!browser || !mediaContainer) {
+			console.log('MediaRenderer: Aborting - no browser or container');
 			isLoading = false;
 			return;
 		}
 
 		try {
+			console.log('MediaRenderer: Starting initialization...');
 			isLoading = true;
 			hasError = false;
 			errorMessage = '';
@@ -100,135 +103,24 @@
 			mediaUrl = mediaInfo.url;
 			mediaType = mediaInfo.type;
 			mediaTitle = mediaInfo.title || `${mediaType.charAt(0).toUpperCase() + mediaType.slice(1)} Player`;
-			
-			console.log('Loading media:', mediaInfo);
-			console.log('Media URL:', mediaUrl);
-			console.log('Media Type:', mediaType);
+
+			console.log('MediaRenderer: Media info extracted', { mediaUrl, mediaType, mediaTitle });
 
 			// For YouTube videos, use iframe embed
 			if (mediaUrl.includes('youtube.com/embed/')) {
+				console.log('MediaRenderer: Creating YouTube player');
 				createYouTubePlayer();
 				return;
 			}
 
-			// Add timeout to prevent indefinite loading
-			const timeoutPromise = new Promise((_, reject) => {
-				setTimeout(() => reject(new Error('Media loading timeout')), 15000);
-			});
-
-			const loadPromise = async () => {
-				// Dynamic import video.js
-				console.log('Importing video.js...');
-				const videojs = (await import('video.js')).default;
-				console.log('video.js imported successfully:', videojs);
-				
-				// Import CSS
-				console.log('Importing video.js CSS...');
-				await import('video.js/dist/video-js.css');
-				console.log('video.js CSS imported successfully');
-
-				// Create video/audio element
-				console.log('Creating media element:', mediaType);
-				const mediaElement = document.createElement(mediaType);
-				mediaElement.className = 'video-js vjs-default-skin';
-				mediaElement.controls = true;
-				mediaElement.preload = 'auto';
-				mediaElement.style.width = '100%';
-				mediaElement.style.height = mediaType === 'video' ? '360px' : '60px';
-				console.log('Media element created:', mediaElement);
-				
-				// Add source
-				const source = document.createElement('source');
-				source.src = mediaUrl;
-				source.type = getMediaMimeType(mediaUrl);
-				mediaElement.appendChild(source);
-				console.log('Source added:', { src: source.src, type: source.type });
-				
-				// Add to container
-				console.log('Adding to container:', mediaContainer);
-				mediaContainer.appendChild(mediaElement);
-				console.log('Element added to container');
-
-				// Initialize Video.js player
-				const playerOptions = {
-					controls: true,
-					responsive: true,
-					fluid: true,
-					playbackRates: [0.5, 1, 1.25, 1.5, 2],
-					preload: 'auto',
-					...(mediaType === 'video' && {
-						aspectRatio: '16:9',
-						poster: undefined
-					}),
-					...(mediaType === 'audio' && {
-						audioOnlyMode: true,
-						audioPosterMode: true
-					})
-				};
-
-				console.log('Initializing video.js player with options:', playerOptions);
-				player = videojs(mediaElement, playerOptions);
-				console.log('Player initialized:', player);
-				
-				// Create a promise that resolves when player is ready or can play
-				return new Promise((resolve, reject) => {
-					let playerReady = false;
-					
-					const cleanup = () => {
-						player.off('ready');
-						player.off('error');
-						player.off('canplay');
-						player.off('loadstart');
-					};
-
-					player.ready(() => {
-						console.log('Player is ready');
-						if (!playerReady) {
-							playerReady = true;
-							cleanup();
-							resolve(undefined);
-						}
-					});
-
-					player.on('error', (error: any) => {
-						console.error('Player error:', error);
-						cleanup();
-						reject(new Error('Failed to load media file'));
-					});
-
-					player.on('canplay', () => {
-						console.log('Media can start playing');
-						if (!playerReady) {
-							playerReady = true;
-							cleanup();
-							resolve(undefined);
-						}
-					});
-
-					player.on('loadstart', () => {
-						console.log('Loading media...');
-					});
-
-					// Fallback timeout for this specific player
-					setTimeout(() => {
-						if (!playerReady) {
-							console.log('Player ready timeout, assuming success');
-							playerReady = true;
-							cleanup();
-							resolve(undefined);
-						}
-					}, 5000);
-				});
-			};
-
-			// Race between loading and timeout
-			await Promise.race([loadPromise(), timeoutPromise]);
+			// Use native HTML5 player for all other media
+			console.log('MediaRenderer: Creating native player');
+			createNativePlayerDirect();
 
 		} catch (error: any) {
 			console.error('Media initialization error:', error);
 			hasError = true;
 			errorMessage = error.message || 'Failed to initialize media player';
-		} finally {
 			isLoading = false;
 		}
 	}
@@ -248,53 +140,128 @@
 		isLoading = false;
 	}
 
+	function createNativePlayerDirect() {
+		console.log('MediaRenderer: Creating native player for', mediaType, mediaUrl);
+		
+		// Create native HTML5 element
+		const mediaElement = document.createElement(mediaType);
+		mediaElement.controls = true;
+		mediaElement.preload = 'metadata';
+		mediaElement.style.width = '100%';
+		mediaElement.style.borderRadius = '4px';
+		mediaElement.style.outline = 'none';
+		
+		if (mediaType === 'video') {
+			mediaElement.style.height = '360px';
+			mediaElement.style.backgroundColor = '#000';
+		} else {
+			mediaElement.style.height = '50px';
+			mediaElement.style.backgroundColor = '#1a1a1a';
+		}
+		
+		// Add source with proper MIME type
+		const source = document.createElement('source');
+		source.src = mediaUrl;
+		source.type = getMediaMimeType(mediaUrl);
+		mediaElement.appendChild(source);
+		
+		console.log('MediaRenderer: Created source with', { src: source.src, type: source.type });
+		
+		// Add fallback sources for better compatibility
+		if (mediaType === 'video' && !mediaUrl.includes('.webm')) {
+			const fallbackSource = document.createElement('source');
+			fallbackSource.src = mediaUrl;
+			fallbackSource.type = 'video/mp4';
+			mediaElement.appendChild(fallbackSource);
+		}
+		
+		// Add to container
+		console.log('MediaRenderer: Adding to container', mediaContainer);
+		mediaContainer.appendChild(mediaElement);
+		console.log('MediaRenderer: Native player created successfully');
+		
+		// Set up event handlers
+		mediaElement.onloadstart = () => {
+			console.log('MediaRenderer: Media load started');
+			isLoading = true;
+		};
+		
+		mediaElement.onloadedmetadata = () => {
+			console.log('MediaRenderer: Media metadata loaded');
+			isLoading = false;
+			player = mediaElement; // Store reference for controls
+		};
+		
+		mediaElement.oncanplay = () => {
+			console.log('MediaRenderer: Media can play');
+			isLoading = false;
+		};
+		
+		mediaElement.onerror = () => {
+			console.error('MediaRenderer: Media error occurred');
+			hasError = true;
+			errorMessage = 'Failed to load media file - format may not be supported';
+			isLoading = false;
+		};
+		
+		// Add accessibility
+		mediaElement.setAttribute('aria-label', mediaTitle);
+		
+		// Store reference
+		player = mediaElement;
+	}
+
 	function getMediaMimeType(url: string): string {
-		const extension = url.split('.').pop()?.toLowerCase();
+		const extension = url.split('?')[0].split('.').pop()?.toLowerCase(); // Remove query params
 		
 		const mimeTypes: Record<string, string> = {
-			// Video
+			// Video formats
 			'mp4': 'video/mp4',
 			'webm': 'video/webm',
 			'mov': 'video/quicktime',
 			'avi': 'video/x-msvideo',
 			'mkv': 'video/x-matroska',
-			'm4v': 'video/x-m4v',
-			// Audio
+			'm4v': 'video/mp4',
+			'ogv': 'video/ogg',
+			// Audio formats
 			'mp3': 'audio/mpeg',
 			'wav': 'audio/wav',
 			'ogg': 'audio/ogg',
 			'aac': 'audio/aac',
 			'm4a': 'audio/mp4',
-			'flac': 'audio/flac'
+			'flac': 'audio/flac',
+			'opus': 'audio/opus'
 		};
 		
-		return mimeTypes[extension || ''] || 'application/octet-stream';
+		return mimeTypes[extension || ''] || (mediaType === 'video' ? 'video/mp4' : 'audio/mpeg');
 	}
 
 	function togglePlayPause() {
-		if (player && !player.paused()) {
-			player.pause();
-		} else if (player) {
-			player.play();
+		if (player instanceof HTMLMediaElement) {
+			if (player.paused) {
+				player.play();
+			} else {
+				player.pause();
+			}
 		}
 	}
 
 	function toggleMute() {
-		if (player) {
-			player.muted(!player.muted());
+		if (player instanceof HTMLMediaElement) {
+			player.muted = !player.muted;
 		}
 	}
 
 	function setVolume(level: number) {
-		if (player) {
-			player.volume(level / 100);
+		if (player instanceof HTMLMediaElement) {
+			player.volume = level / 100;
 		}
 	}
 
 	function toggleFullscreen() {
-		if (player && mediaType === 'video') {
-			if (player.isFullscreen()) {
-				player.exitFullscreen();
+		if (player instanceof HTMLVideoElement) {
+			if (document.fullscreenElement) {
+				document.exitFullscreen();
 			} else {
 				player.requestFullscreen();
 			}
@@ -303,7 +270,7 @@
 
 	// Handle keyboard shortcuts
 	function handleKeydown(event: KeyboardEvent) {
-		if (!player) return;
+		if (!player || !(player instanceof HTMLMediaElement)) return;
 		
 		// Don't interfere with input fields
 		if (event.target instanceof HTMLInputElement) return;
@@ -327,41 +294,63 @@
 				break;
 			case 'ArrowLeft':
 				event.preventDefault();
-				if (player.currentTime() > 10) {
-					player.currentTime(player.currentTime() - 10);
+				if (player.currentTime > 10) {
+					player.currentTime -= 10;
 				} else {
-					player.currentTime(0);
+					player.currentTime = 0;
 				}
 				break;
 			case 'ArrowRight':
 				event.preventDefault();
-				player.currentTime(player.currentTime() + 10);
+				player.currentTime += 10;
 				break;
+		}
+	}
+
+	// Check if we have complete media content
+	function hasCompleteMediaContent(text: string): boolean {
+		if (!text || !text.trim()) return false;
+		
+		// Extract media code block
+		const codeBlockMatch = text.match(/```(?:video|audio)\s*([\s\S]*?)\s*```/i);
+		if (!codeBlockMatch) return false;
+		
+		const mediaContent = codeBlockMatch[1].trim();
+		if (!mediaContent) return false;
+		
+		// Check if we have a valid URL (simple validation)
+		try {
+			extractMediaInfo(text);
+			return true; // extractMediaInfo succeeded
+		} catch {
+			return false; // extractMediaInfo failed (incomplete or invalid content)
 		}
 	}
 
 	// Use effect to initialize when container is available
 	$effect(() => {
-		console.log('Media effect triggered');
-		console.log('Browser available:', browser);
-		console.log('Media container:', mediaContainer);
-		console.log('Content:', content);
-		console.log('Already initialized:', initialized);
+		// Stop triggering if already successfully initialized and rendered
+		if (initialized && (player || mediaUrl.includes('youtube.com')) && !isLoading && !hasError) {
+			return;
+		}
 		
-		if (browser && mediaContainer && content && content.trim() && !initialized) {
-			console.log('All conditions met, initializing media player');
-			initialized = true;
+		// Only initialize when we have complete media content
+		const hasComplete = hasCompleteMediaContent(content);
+		
+		if (browser && mediaContainer && hasComplete && !initialized && !player) {
+			initialized = true; // Set immediately to prevent multiple initializations
 			initializePlayer();
 		}
 		
 		// Cleanup on component destroy
 		return () => {
-			console.log('Media cleanup');
-			if (player) {
-				player.dispose();
+			if (player instanceof HTMLMediaElement) {
+				// Native HTML5 elements clean up automatically
+				// Just pause and reset
+				player.pause();
+				player.currentTime = 0;
 				player = null;
 			}
-			initialized = false; // Reset so it can initialize again if needed
 		};
 	});
 </script>
@@ -397,11 +386,12 @@
 				{/if}
 			</div>
 			<div class="media-controls">
-				{#if !isLoading && !hasError && player && !mediaUrl.includes('youtube.com')}
+				{#if !isLoading && !hasError && player instanceof HTMLMediaElement}
 					<button 
 						class="control-button" 
 						onclick={togglePlayPause}
 						title="Play/Pause (Space)"
+						aria-label="Play/Pause media"
 					>
 						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 							<polygon points="5,3 19,12 5,21"></polygon>
@@ -412,6 +402,7 @@
 						class="control-button" 
 						onclick={toggleMute}
 						title="Mute/Unmute (M)"
+						aria-label="Mute/Unmute media"
 					>
 						<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 							<polygon points="11,5 6,9 2,9 2,15 6,15 11,19"></polygon>
@@ -424,6 +415,7 @@
 							class="control-button" 
 							onclick={toggleFullscreen}
 							title="Fullscreen (F)"
+							aria-label="Toggle fullscreen"
 						>
 							<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 								<polyline points="15,3 21,3 21,9"></polyline>
@@ -562,7 +554,8 @@
 	}
 
 	.media-container.audio {
-		min-height: 80px;
+		min-height: 60px;
+		max-height: 80px;
 		display: flex;
 		align-items: center;
 		justify-content: center;
@@ -649,47 +642,21 @@
 		background-color: #0958a3;
 	}
 
-	/* Video.js custom styling */
-	:global(.video-js) {
-		background-color: #1a1a1a !important;
-		border-radius: 8px !important;
-		font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+	/* Native HTML5 media styling */
+	:global(.media-container video),
+	:global(.media-container audio) {
+		border-radius: 4px;
+		outline: none;
 	}
 
-	:global(.video-js .vjs-control-bar) {
-		background: rgba(0, 0, 0, 0.7) !important;
-		border-radius: 0 0 8px 8px !important;
+	:global(.media-container video:focus),
+	:global(.media-container audio:focus) {
+		outline: 2px solid #0b69a3;
+		outline-offset: 2px;
 	}
 
-	:global(.video-js .vjs-big-play-button) {
-		background-color: rgba(11, 105, 163, 0.8) !important;
-		border: 2px solid #0b69a3 !important;
-		border-radius: 50% !important;
-		font-size: 2.5em !important;
-		line-height: 1.8 !important;
-		height: 2em !important;
-		width: 2em !important;
-		margin-top: -1em !important;
-		margin-left: -1em !important;
-	}
-
-	:global(.video-js .vjs-big-play-button:hover) {
-		background-color: rgba(11, 105, 163, 1) !important;
-	}
-
-	:global(.video-js .vjs-progress-control .vjs-progress-holder) {
-		height: 0.3em !important;
-	}
-
-	:global(.video-js .vjs-progress-control .vjs-play-progress) {
-		background-color: #0b69a3 !important;
-	}
-
-	:global(.video-js .vjs-volume-level) {
-		background-color: #0b69a3 !important;
-	}
-
-	:global(.video-js .vjs-slider) {
-		background-color: rgba(255, 255, 255, 0.2) !important;
+	/* Custom controls styling for browsers that support it */
+	:global(.media-container video::-webkit-media-controls-panel) {
+		background-color: rgba(0, 0, 0, 0.8);
 	}
 </style>

@@ -22,38 +22,44 @@
 	let photoSwipe: any = null;
 	let isZoomed = $state<boolean>(false);
 
-	function extractImageUrl(text: string): string {
+	function extractImageUrls(text: string): string[] {
 		// Extract from ```image code blocks
 		const codeBlockMatch = text.match(/```image\s*([\s\S]*?)\s*```/i);
 		if (codeBlockMatch) {
-			return codeBlockMatch[1].trim();
+			const urls = codeBlockMatch[1].trim().split('\n').map(url => url.trim()).filter(url => url);
+			return urls.length > 0 ? urls : [codeBlockMatch[1].trim()];
 		}
 
 		const trimmed = text.trim();
 		// Direct URL
 		if (/^https?:\/\/.*\.(jpg|jpeg|png|gif|webp|svg)$/i.test(trimmed)) {
-			return trimmed;
+			return [trimmed];
 		}
 
 		// Data URL
 		if (/^data:image\//.test(trimmed)) {
-			return trimmed;
+			return [trimmed];
 		}
 
 		// Markdown image format: ![alt](url)
 		const markdownMatch = text.match(/!\[.*?\]\((.*?)\)/);
 		if (markdownMatch) {
-			return markdownMatch[1];
+			return [markdownMatch[1]];
 		}
 
 		// HTML img tag
 		const htmlMatch = text.match(/<img[^>]+src="([^"]+)"/i);
 		if (htmlMatch) {
-			return htmlMatch[1];
+			return [htmlMatch[1]];
 		}
 
 		// Fallback: assume it's a URL
-		return text.trim();
+		return [text.trim()];
+	}
+
+	// Legacy single URL function for backward compatibility
+	function extractImageUrl(text: string): string {
+		return extractImageUrls(text)[0] || '';
 	}
 
 	function getImageType(url: string): string {
@@ -118,29 +124,34 @@
 	}
 
 	async function openPhotoSwipe() {
-		if (!browser || !imageElement) return;
+		await openPhotoSwipeGallery(0);
+	}
+
+	async function openPhotoSwipeGallery(startIndex: number = 0) {
+		if (!browser) return;
 
 		try {
 			// Dynamic import PhotoSwipe v5
 			const { default: PhotoSwipe } = await import('photoswipe');
 
-			const items = [{
-				src: extractImageUrl(content),
-				width: imageInfo.width || 1200,
-				height: imageInfo.height || 800,
-				alt: `${imageInfo.type || 'Image'} • ${imageInfo.width || '?'} × ${imageInfo.height || '?'}${imageInfo.size ? ` • ${imageInfo.size}` : ''}`
-			}];
+			const imageUrls = extractImageUrls(content);
+			const items = imageUrls.map((url, index) => ({
+				src: url,
+				width: 1200, // Default width, PhotoSwipe will detect actual size
+				height: 800, // Default height
+				alt: `Image ${index + 1} of ${imageUrls.length}`
+			}));
 
 			const options = {
 				dataSource: items,
-				index: 0,
+				index: startIndex,
 				bgOpacity: 0.9,
 				showHideAnimationDuration: 300,
 				zoom: true,
 				close: true,
-				counter: false,
-				arrowPrev: false,
-				arrowNext: false,
+				counter: imageUrls.length > 1,
+				arrowPrev: imageUrls.length > 1,
+				arrowNext: imageUrls.length > 1,
 				initialZoomLevel: 'fit',
 				secondaryZoomLevel: 1.5,
 				maxZoomLevel: 3
@@ -151,7 +162,7 @@
 			
 			// Add event listeners
 			photoSwipe.on('loadComplete', (e) => {
-				console.log('PhotoSwipe image loaded:', e.index);
+				// Photo loaded
 			});
 
 			photoSwipe.on('destroy', () => {
@@ -187,7 +198,7 @@
 	function copyImageUrl() {
 		const url = extractImageUrl(content);
 		navigator.clipboard.writeText(url).then(() => {
-			console.log('Image URL copied to clipboard');
+			// console.log('Image URL copied to clipboard');
 		}).catch(err => {
 			console.error('Failed to copy image URL:', err);
 		});
@@ -225,16 +236,22 @@
 	{:else}
 		<div class="image-header">
 			<div class="image-info">
-				{#if imageInfo.width && imageInfo.height}
-					<span class="image-dimensions">
-						{imageInfo.width} × {imageInfo.height}
+				{#if extractImageUrls(content).length > 1}
+					<span class="image-count">
+						{extractImageUrls(content).length} Images
 					</span>
-				{/if}
-				{#if imageInfo.type}
-					<span class="image-type">{imageInfo.type}</span>
-				{/if}
-				{#if imageInfo.size}
-					<span class="image-size">{imageInfo.size}</span>
+				{:else}
+					{#if imageInfo.width && imageInfo.height}
+						<span class="image-dimensions">
+							{imageInfo.width} × {imageInfo.height}
+						</span>
+					{/if}
+					{#if imageInfo.type}
+						<span class="image-type">{imageInfo.type}</span>
+					{/if}
+					{#if imageInfo.size}
+						<span class="image-size">{imageInfo.size}</span>
+					{/if}
 				{/if}
 			</div>
 			<div class="image-actions">
@@ -278,21 +295,41 @@
 			{#if isLoading}
 				<div class="loading-container">
 					<div class="loading-spinner"></div>
-					<span>Loading image...</span>
+					<span>Loading image{extractImageUrls(content).length > 1 ? 's' : ''}...</span>
 				</div>
 			{/if}
 
-			<img
-				bind:this={imageElement}
-				src={extractImageUrl(content)}
-				alt="User uploaded image"
-				class="image"
-				class:hidden={isLoading}
-				class:zoomed={isZoomed}
-				onload={handleImageLoad}
-				onerror={handleImageError}
-				onclick={openPhotoSwipe}
-			/>
+			{#if extractImageUrls(content).length === 1}
+				{@const imageUrls = extractImageUrls(content)}
+				<!-- Single image display -->
+				<img
+					bind:this={imageElement}
+					src={imageUrls[0]}
+					alt="User uploaded image"
+					class="image single-image"
+					class:hidden={isLoading}
+					class:zoomed={isZoomed}
+					onload={handleImageLoad}
+					onerror={handleImageError}
+					onclick={openPhotoSwipe}
+				/>
+			{:else}
+				{@const imageUrls = extractImageUrls(content)}
+				<!-- Multiple images gallery -->
+				<div class="image-gallery">
+					{#each imageUrls as imageUrl, index}
+						<img
+							src={imageUrl}
+							alt="Gallery image {index + 1}"
+							class="gallery-image"
+							class:hidden={isLoading}
+							onload={index === 0 ? handleImageLoad : undefined}
+							onerror={handleImageError}
+							onclick={() => openPhotoSwipeGallery(index)}
+						/>
+					{/each}
+				</div>
+			{/if}
 		</div>
 	{/if}
 </div>
@@ -395,7 +432,8 @@
 		background-color: rgba(0, 0, 0, 0.1);
 	}
 
-	.image {
+	.image,
+	.single-image {
 		max-width: 100%;
 		max-height: 400px;
 		border-radius: 6px;
@@ -404,16 +442,53 @@
 		object-fit: contain;
 	}
 
-	.image:hover {
+	.image:hover,
+	.single-image:hover {
 		transform: scale(1.02);
 	}
 
-	.image.zoomed {
+	.image.zoomed,
+	.single-image.zoomed {
 		cursor: zoom-out;
 	}
 
-	.image.hidden {
+	.image.hidden,
+	.single-image.hidden {
 		display: none;
+	}
+
+	.image-gallery {
+		display: grid;
+		gap: 0.5rem;
+		width: 100%;
+		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+		max-width: 600px;
+	}
+
+	.gallery-image {
+		width: 100%;
+		height: 200px;
+		object-fit: cover;
+		border-radius: 6px;
+		cursor: zoom-in;
+		transition: transform 0.2s ease, opacity 0.2s ease;
+	}
+
+	.gallery-image:hover {
+		transform: scale(1.05);
+		opacity: 0.9;
+	}
+
+	.gallery-image.hidden {
+		display: none;
+	}
+
+	.image-count {
+		background-color: rgba(74, 194, 107, 0.2);
+		color: #4ac26b;
+		padding: 0.2rem 0.4rem;
+		border-radius: 3px;
+		font-weight: 500;
 	}
 
 	.loading-container {

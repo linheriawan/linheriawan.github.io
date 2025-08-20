@@ -16,31 +16,19 @@
 	interface Props {
 		content: string;
 		sender: 'user' | 'ai';
+		renderingStrategy?: 'realtime' | 'stream-finish';
 	}
 
-	let { content, sender }: Props = $props();
+	let { content, sender, renderingStrategy = 'stream-finish' }: Props = $props();
 
-	// Content analysis for mixed content support
-	let hasMarkdown = $state<boolean>(false);
-	let hasMermaid = $state<boolean>(false);
-	let hasMath = $state<boolean>(false);
-	let hasCode = $state<boolean>(false);
-	let hasImage = $state<boolean>(false);
-	let hasChart = $state<boolean>(false);
-	let hasMarp = $state<boolean>(false);
-	let hasTable = $state<boolean>(false);
-	let hasPDF = $state<boolean>(false);
-	let hasTimeline = $state<boolean>(false);
-	let hasMedia = $state<boolean>(false);
-	let hasUrlPreview = $state<boolean>(false);
-	let hasFile = $state<boolean>(false);
+	// Direct renderer detection - priority-based approach
+	let selectedRenderer = $state<string>('text');
 	let processedContent = $state<string>('');
 
-	// Simplified content analysis - only check for ```[keyword] patterns
-	function analyzeContent(text: string) {
+	// Direct content detection with priority order
+	function detectRenderer(text: string): string {
 		if (!text || typeof text !== 'string') {
-			resetFlags();
-			return;
+			return 'text';
 		}
 
 		// Safety: Limit analysis to reasonable content size
@@ -48,98 +36,106 @@
 		const analysisText = text.length > maxAnalysisSize ? text.substring(0, maxAnalysisSize) : text;
 
 		try {
-			// Check for code block patterns only
-			hasMarp = /```marp[\s\S]*?```/i.test(analysisText);
-			hasChart = /```chart[\s\S]*?```/i.test(analysisText);
-			hasTable = /```(?:table|csv)[\s\S]*?```/i.test(analysisText);
-			hasMermaid = /```mermaid[\s\S]*?```/i.test(analysisText);
-			hasTimeline = /```timeline[\s\S]*?```/i.test(analysisText);
-			hasPDF = /```pdf[\s\S]*?```/i.test(analysisText);
-			hasMedia = /```(?:video|audio)[\s\S]*?```/i.test(analysisText);
-			hasFile = /```file[\s\S]*?```/i.test(analysisText);
-			hasUrlPreview = /```url[\s\S]*?```/i.test(analysisText);
-			hasImage = /```image[\s\S]*?```/i.test(analysisText);
+			// Count different content types for mixed content detection
+			const patterns = {
+				marp: /```marp[\s\S]*?```/gi,
+				chart: /```chart[\s\S]*?```/gi,
+				table: /```(?:table|csv)[\s\S]*?```/gi,
+				mermaid: /```mermaid[\s\S]*?```/gi,
+				timeline: /```timeline[\s\S]*?```/gi,
+				pdf: /```pdf[\s\S]*?```/gi,
+				media: /```(?:video|audio)[\s\S]*?```/gi,
+				file: /```file[\s\S]*?```/gi,
+				url: /```url[\s\S]*?```/gi,
+				image: /```image[\s\S]*?```/gi,
+				code: /```(?!marp|chart|table|csv|mermaid|timeline|pdf|video|audio|file|url|image)[\w]*[\s\S]*?```/gi,
+				math: /\$\$[\s\S]*?\$\$|\$[^$\n]+\$|\\begin\{[^}]+\}[\s\S]*?\\end\{[^}]+\}|\\[[\s\S]*?\\]|\\([^)]*\\)/g
+			};
 
-			// Check for code blocks (excluding special keywords)
-			hasCode = /```(?!marp|chart|table|csv|mermaid|timeline|pdf|video|audio|file|url|image)[\w]*[\s\S]*?```/i.test(analysisText);
+			// Count matches for each pattern
+			const counts = Object.fromEntries(
+				Object.entries(patterns).map(([key, pattern]) => [
+					key, 
+					(analysisText.match(pattern) || []).length
+				])
+			);
 
-			// Check for math formulas (LaTeX) - keep this as it uses different syntax
-			hasMath = /\$\$[\s\S]*?\$\$|\$[^$\n]+\$|\\begin\{[^}]+\}[\s\S]*?\\end\{[^}]+\}|\\[[\s\S]*?\\]|\\([^)]*\\)/.test(analysisText);
+			// Check for markdown patterns
+			const hasMarkdown = /^#{1,6}\s|[\*_]{1,2}[^\*_]+[\*_]{1,2}|`[^`]+`|\[[^\]]*\]\([^)]*\)|^[-\*\+]\s|\d+\.\s/m.test(analysisText) && text.length > 5;
 
-			// Check for markdown (improved detection) - keep for mixed content
-			hasMarkdown = /^#{1,6}\s|[\*_]{1,2}[^\*_]+[\*_]{1,2}|`[^`]+`|\[[^\]]*\]\([^)]*\)|^[-\*\+]\s|\d+\.\s/m.test(analysisText) && text.length > 5;
+			// Calculate total special content blocks
+			const specialContentCount = Object.values(counts).reduce((sum, count) => sum + count, 0);
+			
+			// If multiple content types or markdown present, use MarkdownRenderer for mixed content
+			if (specialContentCount > 1 || (specialContentCount >= 1 && hasMarkdown)) {
+				return 'markdown';
+			}
+
+			// Priority-based single renderer selection (most specific first)
+			if (counts.marp > 0) return 'marp';
+			if (counts.chart > 0) return 'chart';
+			if (counts.timeline > 0) return 'timeline';
+			if (counts.mermaid > 0) return 'mermaid';
+			if (counts.media > 0) return 'media';
+			if (counts.image > 0) return 'image';
+			if (counts.pdf > 0) return 'pdf';
+			if (counts.file > 0) return 'file';
+			if (counts.url > 0) return 'url';
+			if (counts.table > 0) return 'table';
+			if (counts.code > 0) return 'code';
+			if (counts.math > 0) return 'math';
+
+			// Check for pure markdown content
+			if (hasMarkdown) return 'markdown';
+
+			// Default to plain text
+			return 'text';
 
 		} catch (error) {
-			console.error('Content analysis error:', error);
-			resetFlags();
+			console.error('Renderer detection error:', error);
+			return 'text';
 		}
 	}
 
-	function resetFlags() {
-		hasMarkdown = false;
-		hasMermaid = false;
-		hasMath = false;
-		hasCode = false;
-		hasImage = false;
-		hasChart = false;
-		hasMarp = false;
-		hasTable = false;
-		hasPDF = false;
-		hasTimeline = false;
-		hasMedia = false;
-		hasUrlPreview = false;
-		hasFile = false;
-	}
-
 	onMount(() => {
-		analyzeContent(content);
+		selectedRenderer = detectRenderer(content);
 		processedContent = content;
 	});
 
 	// Update when content changes
 	$effect(() => {
-		analyzeContent(content);
+		selectedRenderer = detectRenderer(content);
 		processedContent = content;
 	});
 </script>
 
 <div class="message-renderer" class:user-message={sender === 'user'} class:ai-message={sender === 'ai'}>
-	{#if hasImage && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTable && !hasTimeline && !hasMedia && !hasFile && !hasUrlPreview && !hasPDF}
-		<!-- Pure image content only -->
+	{#if selectedRenderer === 'image'}
 		<ImageRenderer {content} />
-	{:else if hasPDF && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTable && !hasTimeline && !hasMedia && !hasFile && !hasUrlPreview && !hasImage}
-		<!-- Pure PDF content only -->
+	{:else if selectedRenderer === 'pdf'}
 		<PDFRenderer {content} />
-	{:else if hasMedia && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTable && !hasTimeline && !hasFile && !hasUrlPreview && !hasImage && !hasPDF}
-		<!-- Pure media content only -->
+	{:else if selectedRenderer === 'media'}
 		<MediaRenderer {content} />
-	{:else if hasFile && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTable && !hasTimeline && !hasMedia && !hasUrlPreview && !hasImage && !hasPDF}
-		<!-- Pure file content only -->
+	{:else if selectedRenderer === 'file'}
 		<FileRenderer {content} />
-	{:else if hasUrlPreview && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTable && !hasTimeline && !hasMedia && !hasFile && !hasImage && !hasPDF}
-		<!-- Pure URL preview content only -->
+	{:else if selectedRenderer === 'url'}
 		<URLPreviewRenderer {content} />
-	{:else if hasTimeline && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTable && !hasMedia && !hasFile && !hasUrlPreview && !hasImage && !hasPDF}
-		<!-- Pure timeline content only -->
+	{:else if selectedRenderer === 'timeline'}
 		<TimelineRenderer {content} />
-	{:else if hasChart && !hasMarkdown && !hasMath && !hasCode && !hasMermaid && !hasMarp && !hasTable && !hasTimeline && !hasMedia && !hasFile && !hasUrlPreview && !hasImage && !hasPDF}
-		<!-- Pure chart content only -->
+	{:else if selectedRenderer === 'chart'}
 		<ChartRenderer {content} />
-	{:else if hasMermaid && !hasMarkdown && !hasMath && !hasCode && !hasChart && !hasMarp && !hasTable && !hasTimeline && !hasMedia && !hasFile && !hasUrlPreview && !hasImage && !hasPDF}
-		<!-- Pure mermaid content only -->
+	{:else if selectedRenderer === 'mermaid'}
 		<MermaidRenderer {content} />
-	{:else if hasCode && !hasMarkdown && !hasMath && !hasMermaid && !hasChart && !hasMarp && !hasTable && !hasTimeline && !hasMedia && !hasFile && !hasUrlPreview && !hasImage && !hasPDF}
-		<!-- Pure code content only -->
+	{:else if selectedRenderer === 'code'}
 		<CodeRenderer {content} />
-	{:else if hasMath && !hasMarkdown && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTable && !hasTimeline && !hasMedia && !hasFile && !hasUrlPreview && !hasImage && !hasPDF}
-		<!-- Pure math content only -->
+	{:else if selectedRenderer === 'math'}
 		<MathRenderer {content} />
-	{:else if hasTable && !hasMath && !hasCode && !hasMermaid && !hasChart && !hasMarp && !hasTimeline && !hasMedia && !hasFile && !hasUrlPreview && !hasImage && !hasPDF}
-		<!-- Pure table content only (allow with markdown for mixed content) -->
+	{:else if selectedRenderer === 'table'}
 		<TableRenderer {content} />
-	{:else if hasMarkdown || hasMermaid || hasMath || hasCode || hasChart || hasMarp || hasTable || hasPDF || hasTimeline || hasMedia || hasFile || hasUrlPreview || hasImage}
-		<!-- Mixed content or markdown - let MarkdownRenderer handle everything -->
-		<MarkdownRenderer {content} />
+	{:else if selectedRenderer === 'marp'}
+		<MarkdownRenderer {content} {renderingStrategy} />
+	{:else if selectedRenderer === 'markdown'}
+		<MarkdownRenderer {content} {renderingStrategy} />
 	{:else}
 		<!-- Plain text fallback -->
 		<div class="text-content">

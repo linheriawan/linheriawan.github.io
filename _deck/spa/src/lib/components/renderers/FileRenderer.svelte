@@ -213,7 +213,7 @@
 	function copyUrl() {
 		if (fileData.url) {
 			navigator.clipboard.writeText(fileData.url).then(() => {
-				console.log('File URL copied to clipboard');
+				// console.log('File URL copied to clipboard');
 			}).catch(err => {
 				console.error('Failed to copy URL:', err);
 			});
@@ -234,13 +234,13 @@
 			hasError = false;
 			
 			const fileInfo = extractFileInfo(content);
-			console.log('Loading file info for:', fileInfo);
+			// console.log('Loading file info for:', fileInfo);
 
 			// Simulate network delay
 			await new Promise(resolve => setTimeout(resolve, 500));
 			
 			fileData = analyzeFile(fileInfo.url, fileInfo.filename);
-			console.log('File data:', fileData);
+			// console.log('File data:', fileData);
 
 		} catch (error: any) {
 			console.error('File analysis error:', error);
