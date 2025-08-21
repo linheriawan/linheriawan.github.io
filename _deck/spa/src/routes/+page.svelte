@@ -7,9 +7,7 @@
 		sender: 'user' | 'ai';
 	}
 
-	let messages = $state<Message[]>([
-		{ id: 1, text: "Hello! How can I help you today? I can render **markdown**, `code blocks`, mathematical formulas like $x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$, and even Mermaid diagrams!", sender: 'ai' }
-	]);
+	let messages = $state<Message[]>([]);
 	let inputText = $state('');
 	let chatHistory = $state<string[]>([]);
 	let messagesContainer: HTMLDivElement;
@@ -26,7 +24,7 @@
 	// Simulate streaming for demo content
 	async function simulateStreaming(content: string, messageId: number) {
 		const words = content.split(' ');
-		const chunkSize = Math.max(1, Math.floor(words.length / 20)); // ~20 chunks
+		const chunkSize = Math.max(1, Math.floor(words.length / 20)); // Send ~5% of words per chunk
 		
 		for (let i = 0; i < words.length; i += chunkSize) {
 			const chunk = words.slice(i, i + chunkSize).join(' ') + (i + chunkSize < words.length ? ' ' : '');
@@ -37,15 +35,15 @@
 					: msg
 			);
 			
-			// Small delay to simulate network latency
-			await new Promise(resolve => setTimeout(resolve, 50));
+			// Realistic delay to simulate AI response speed
+			await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 50));
 		}
 	}
 
 	// Auto-scroll when messages change
 	$effect(() => {
 		messages; // Subscribe to messages changes
-		// scrollToBottom();
+		scrollToBottom();
 	});
 	function newChat() {
 		// Add current conversation to history if it has content
@@ -61,9 +59,7 @@
 		}
 		
 		// Reset to initial state
-		messages = [
-			{ id: 1, text: "Hello! How can I help you today? I can render **markdown**, `code blocks`, mathematical formulas like $x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$, and even Mermaid diagrams!", sender: 'ai' }
-		];
+		messages = [];
 		inputText = '';
 	}
 
@@ -83,9 +79,9 @@
 		// Clear input immediately
 		inputText = '';
 
-		// Check for demo commands
+		// Check for exact demo commands (only single digits)
 		const demoCommands = ['1', '2', '3','4'];
-		if (demoCommands.includes(userInput.trim())) {
+		if (demoCommands.includes(userInput.trim()) && userInput.trim().length === 1) {
 			const command = userInput.trim();
 			const fileMap = {
 				'1': '/src/mock/resp_1.md',
@@ -104,7 +100,7 @@
 			try {
 				const response = await fetch(fileMap[command]);
 				const testContent = await response.text();
-				
+								
 				// Simulate streaming by adding content in chunks
 				await simulateStreaming(testContent, aiMessageId);
 				return;
@@ -221,11 +217,11 @@
 					<p>Your chat history will appear here.</p>
 					<div class="demo-help">
 						<small><strong>Try these:</strong></small>
-						<small>• Send "1" for mixed content demo</small>
-						<small>• Send "2" for Presentations and Math formulas</small>
-						<small>• Send "3" for PDF documents, File downloads and URL previews</small>
-						<small>• Send "4" for table-only debugging</small>
-						<small>• Send any text for real AI chat</small>
+						<small>Send "1" for mixed content demo</small>
+						<small>Send "2" for Presentations and Math formulas</small>
+						<small>Send "3" for PDF documents, File downloads and URL previews</small>
+						<small>Send "4" for debugging small amount of renderer</small>
+						<small>Send any text for real AI chat</small>
 					</div>
 				</div>
 			{:else}
@@ -241,8 +237,10 @@
 
 		<!-- Messages -->
 		<div class="messages" bind:this={messagesContainer}>
-			{#each messages as msg}
-				<MessageRenderer content={msg.text} sender={msg.sender} />
+			{#each messages as msg (msg.id)}
+				{#key `${msg.id}-${Math.floor(msg.text.length / 100)}`}
+					<MessageRenderer content={msg.text} sender={msg.sender} />
+				{/key}
 			{/each}
 		</div>
 

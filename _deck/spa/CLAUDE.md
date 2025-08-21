@@ -142,32 +142,61 @@ src/lib/components/
 
 ### Rendering Architecture Changes (Aug 2024)
 
-**PROBLEM SOLVED**: Previous architecture had complex dual detection system between MessageRenderer and MarkdownRenderer causing:
-- Multiple duplicate registrations during streaming
-- Table renderer showing "initialized" but never "done rendering"
-- Container timing issues preventing proper component mounting
-- Excessive deduplication logic that prevented proper renderer creation
+**MAJOR FIXES APPLIED**: Fixed critical streaming-related rendering issues:
 
-**NEW SOLUTION**: Centralized markdown-first architecture in MessageRenderer.svelte:
-- **Single responsibility**: MessageRenderer handles ALL content detection and processing
-- **Markdown-first**: Content processed as markdown by default with embedded special renderers
-- **Direct mounting**: Special renderers mounted directly using Svelte's mount() function
-- **Simplified flow**: No complex registry systems or dual detection
-- **Proper logging**: Each renderer shows both initialization and completion logs
+**PROBLEMS SOLVED**:
+- ❌ **Premature initialization**: Renderers triggered before complete content received during streaming
+- ❌ **Container binding issues**: Elements not available when `$effect` runs due to conditional rendering  
+- ❌ **Cleanup interference**: `$effect` cleanup functions clearing content immediately after creation
+- ❌ **Multiple mounting**: Components re-mounted repeatedly during streaming causing bandwidth waste
+- ❌ **Dynamic import timeouts**: TimelineRenderer stuck on loading with timeout errors
+
+**SOLUTIONS IMPLEMENTED**:
+
+**1. Initialization Pattern Fixes**:
+- **TableRenderer**: Replaced `onMount` with `$effect`, fixed container binding with `style="display"` instead of conditional rendering
+- **TimelineRenderer**: Replaced `onMount` with `$effect`, replaced dynamic imports with static imports, removed cleanup interference  
+- **MediaRenderer**: Added proper `!player` checks to prevent re-initialization, fixed container binding timing
+- **ChartRenderer**: Replaced dual `onMount`+`$effect` with single `$effect`, fixed canvas binding, added Chart.js controller registration
+- **MermaidRenderer**: Replaced `onMount` with `$effect`, added content completion validation
+
+**2. Content Completion Validation**:
+- Added completion checks for streaming content (CSV tables, JSON charts, mermaid syntax, media URLs)
+- Renderers only initialize when complete content blocks are received
+- Prevents parse errors and malformed output during streaming
+
+**3. Container Binding Pattern**:
+```svelte
+<!-- BEFORE: Conditional rendering breaks binding -->
+{#if !isLoading}
+  <div bind:this={container}></div>
+{/if}
+
+<!-- AFTER: Always present, conditionally visible -->
+<div bind:this={container} style="display: {isLoading ? 'none' : 'block'}"></div>
+```
+
+**4. Cleanup Function Safety**:
+- Removed aggressive cleanup that cleared content during streaming
+- Let Svelte handle DOM cleanup naturally on component destroy
+- Only cleanup external resources (timeline.destroy(), chart.destroy()) when actually needed
+
+**5. Import Optimizations**:
+- TimelineRenderer: Static imports instead of dynamic imports (eliminated timeouts)
+- ChartRenderer: Proper Chart.js controller registration (BarController, LineController, etc.)
+- MessageRenderer: Duplicate mounting prevention with placeholder children check
 
 **Key Implementation Details**:
-- MarkdownRenderer.svelte is now **UNUSED** - all functionality moved to MessageRenderer
-- All renderer components imported directly in MessageRenderer
-- specialBlocks Map tracks components that need special rendering
-- Custom marked.js renderer detects special code blocks during markdown processing
-- Components mounted with 10ms timeout to ensure DOM is ready
-- Each renderer gets formatted content: `\`\`\`type\ndata\n\`\`\``
+- All renderers use `$effect(() => { if (browser && container && content && !initialized) ... })` pattern
+- Content completion validation prevents premature rendering during streaming
+- Container elements always present in DOM, visibility controlled by CSS
+- Static imports preferred over dynamic imports for better performance and reliability
 
 **Demo Commands for Testing**:
 - Send "1" - Mixed content with 11 different renderers
 - Send "2" - Presentations and Math formulas  
 - Send "3" - PDF documents, File downloads, URL previews
-- Send "4" - Table-only debugging (CSV and table formats)
+- Send "4" - is to test small amount of renderer usage
 
 ### Environment Variables
 

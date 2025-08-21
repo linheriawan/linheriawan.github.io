@@ -12,11 +12,6 @@ https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf
 https://arxiv.org/pdf/1706.03762.pdf
 ```
 
-### Sample Report
-```pdf
-https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf
-```
-
 The PDF renderer provides:
 - **Page Navigation** - Jump to specific pages, next/previous controls
 - **Zoom Controls** - Fit to width, fit to page, custom zoom levels  
@@ -97,6 +92,15 @@ https://twitter.com/sveltejs
 https://techcrunch.com/2024/01/15/the-future-of-web-development/
 ```
 
+
+Preview cards show:
+- Website title and description
+- Thumbnail image when available
+- Domain name and favicon
+- Publication date for articles
+- Author information when available
+- Read time estimates for articles
+
 The URL preview renderer provides:
 - **Meta Data Extraction** - Fetches title, description, and images from Open Graph tags
 - **Favicon Display** - Shows website icons for brand recognition
@@ -106,11 +110,3 @@ The URL preview renderer provides:
 - **Security Scanning** - Warns about potentially unsafe links
 - **Mobile Optimization** - Responsive preview cards
 - **Click Analytics** - Track engagement with external links
-
-Preview cards show:
-- Website title and description
-- Thumbnail image when available
-- Domain name and favicon
-- Publication date for articles
-- Author information when available
-- Read time estimates for articles

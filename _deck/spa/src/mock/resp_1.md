@@ -3,25 +3,25 @@ renderer to support visualizing the data in the conversation session.
 
 ## Single Image
 ```image
-http://localhost:8000/media/barbie-doll-clipart.jpg
+/media/barbie-doll-clipart.jpg
 ```
 
 ## Multiple Images Gallery
 ```image
-http://localhost:8000/media/barbie-doll-clipart.jpg
-http://localhost:8000/media/barbie-movies.jpg
+/media/barbie-doll-clipart.jpg
+/media/barbie-movies.jpg
 ```
 
 ## Audio Test
 
 ```audio
-http://localhost:8000/media/KalimFrancis Lai - Love Storyba.mp3
+/media/Francis%20Lai%20-%20Love%20Story.mp3
 ```
 
 ## Video Test
 
 ```video
-http://localhost:8000/media/shinchan0st.mp4
+/media/shinchan0st.mp4
 ```
 
 ## Code Block
@@ -90,12 +90,14 @@ Here is  example of the timeline visualization:
 [
   {
     "id": 1,
+    "group":"PMO",
     "content": "Project Started",
     "start": "2024-01-01",
     "type": "point"
   },
   {
     "id": 2,
+    "group":"Working",
     "content": "Development Phase",
     "start": "2024-01-15",
     "end": "2024-02-15",
@@ -103,6 +105,7 @@ Here is  example of the timeline visualization:
   },
   {
     "id": 3,
+    "group":"PMO",
     "content": "Testing Phase",
     "start": "2024-02-16",
     "end": "2024-03-01",
@@ -111,9 +114,7 @@ Here is  example of the timeline visualization:
 ]
 ```
 
-## Chart
-here is barchart:
-
+**here is barchart:**
 ```chart
 {
     "type": "bar",
@@ -125,12 +126,39 @@ here is barchart:
     }
 }
 ```
+
+**Pie:**
+```chart
+{
+    "type": "pie",
+    "data": {
+        "labels": ["Jan", "Feb", "Mar", "Apr", "May"],
+        "datasets": [{ "label": "Sales",      "data": [12, 19, 3, 5, 2],
+        "backgroundColor": ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF"]
+        }]
+    }
+}
+```
+
+**Line:**
+```chart
+{
+    "type": "line",
+    "data": {
+        "labels": ["Jan", "Feb", "Mar", "Apr", "May"],
+        "datasets": [{ "label": "Sales",      "data": [12, 19, 3, 5, 2],
+        "backgroundColor": ["#FF6384", "#36A2EB", "#FFCE56", "#4BC0C0", "#9966FF"]
+        }]
+    }
+}
+```
+
 # Mermaid
 Here's a Mermaid diagram:
 ```mermaid
 graph TD
     A[Start] --> B{Is it working?} 
-    B --> | Yes | C[Great!] 
-    B --> | No | D[Debug it] 
-    D --> A 
+    B --> | Yes | C[Great!]
+    B --> | No | D[Debug it]
+    D --> A
 ```

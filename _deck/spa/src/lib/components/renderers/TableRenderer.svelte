@@ -143,7 +143,9 @@
 	}
 
 	function createHtmlTable() {
-		if (!tableContainer || !tableData.rows.length) return;
+		if (!tableContainer || !tableData.rows.length) {
+				return;
+		}
 		
 		// Create a simple HTML table
 		const table = document.createElement('table');
@@ -198,12 +200,8 @@
 			if (tableData.rows.length === 0) {
 				throw new Error('No data rows found');
 			}
-
 			// Create native HTML table
 			createHtmlTable();
-			
-			console.log('✅ tablerenderer done rendering');
-
 		} catch (error: any) {
 			console.error('Table initialization error:', error);
 			hasError = true;
@@ -248,25 +246,14 @@
 		URL.revokeObjectURL(url);
 	}
 
-	// Use onMount to initialize when component is ready
-	onMount(() => {
-		if (browser) {
-			console.log('🚀 tablerenderer is initialize');
-			// Small delay to ensure DOM is ready
-			setTimeout(() => {
-				if (tableContainer && content && !initialized) {
-						initialized = true;
-					initializeTable();
-				}
-			}, 10);
+	// Use $effect to reactively initialize when content and container are ready
+	$effect(() => {
+		
+		if (browser && tableContainer && content && !initialized) {
+			initialized = true;
+			initializeTable();
 		}
 		
-		// Cleanup on component destroy
-		return () => {
-			if (tableContainer) {
-				tableContainer.innerHTML = '';
-			}
-		};
 	});
 </script>
 
@@ -326,16 +313,17 @@
 		</div>
 
 		<div class="table-content" class:loading={isLoading}>
+			<div 
+				bind:this={tableContainer}
+				class="table-container"
+				style="display: {isLoading ? 'none' : 'block'}"
+			></div>
+			
 			{#if isLoading}
 				<div class="loading-container">
 					<div class="loading-spinner"></div>
 					<span>Loading table...</span>
 				</div>
-			{:else}
-				<div 
-					bind:this={tableContainer}
-					class="table-container"
-				></div>
 			{/if}
 		</div>
 	{/if}

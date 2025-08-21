@@ -128,9 +128,9 @@ export async function POST({ request, url }) {
 	try {
 		const { message, model = 'llama3.2' } = await request.json();
 
-		// Check if message is a valid mock number (1,2,5,6,7) for mock responses
+		// Check if message is a valid mock number (1,2,3,4) for mock responses
 		const messageStr = message.toString().trim();
-		const isMockNumber = /^[12567]$/.test(messageStr);
+		const isMockNumber = /^[1234]$/.test(messageStr);
 		
 		// Set up streaming response
 		const stream = new ReadableStream({
@@ -159,30 +159,13 @@ export async function POST({ request, url }) {
 				} catch (error) {
 					console.error('Streaming error:', error);
 					
-					// Send error and fallback to mock
-					const errorData = JSON.stringify({ 
-						error: error.message,
-						fallback: true
-					});
-					controller.enqueue(new TextEncoder().encode(`data: ${errorData}\n\n`));
+					// Send simple error message instead of fallback
+					const errorMessage = "Sorry, I'm having trouble connecting to the AI service. Please try again later.";
+					const data = JSON.stringify({ content: errorMessage });
+					controller.enqueue(new TextEncoder().encode(`data: ${data}\n\n`));
 					
-					// Try to stream a fallback mock response
-					try {
-						const fallbackContent = await getMockResponse('1'); // Default mixed content
-						for await (const chunk of streamMockResponse(fallbackContent)) {
-							const data = JSON.stringify({ content: chunk });
-							controller.enqueue(new TextEncoder().encode(`data: ${data}\n\n`));
-						}
-						
-						const endData = JSON.stringify({ done: true });
-						controller.enqueue(new TextEncoder().encode(`data: ${endData}\n\n`));
-					} catch (fallbackError) {
-						const finalErrorData = JSON.stringify({ 
-							error: 'Service temporarily unavailable',
-							done: true
-						});
-						controller.enqueue(new TextEncoder().encode(`data: ${finalErrorData}\n\n`));
-					}
+					const endData = JSON.stringify({ done: true });
+					controller.enqueue(new TextEncoder().encode(`data: ${endData}\n\n`));
 				} finally {
 					controller.close();
 				}

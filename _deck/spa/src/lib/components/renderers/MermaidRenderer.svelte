@@ -81,6 +81,44 @@
 		return text.trim();
 	}
 
+	// Check if we have complete mermaid content
+	function hasCompleteMermaidContent(text: string): boolean {
+		if (!text || !text.trim()) return false;
+		
+		// Check for complete ```mermaid...``` block
+		const mermaidMatch = text.match(/```mermaid\s*\n([\s\S]*?)```/i);
+		if (!mermaidMatch) return false;
+		
+		const mermaidCode = mermaidMatch[1].trim();
+		if (!mermaidCode) return false;
+		
+		// Clean the code first to test if it would be valid
+		const cleanedCode = mermaidCode
+			.split('\n')
+			.map(line => line.replace(/\s+$/, ''))
+			.join('\n')
+			.replace(/\n+$/, '');
+		
+		// Test if the cleaned code would be parseable by mermaid
+		try {
+			// Basic syntax validation - must have complete structure
+			const lines = cleanedCode.split('\n').filter(line => line.trim());
+			if (lines.length < 2) return false; // Need at least graph declaration + one element
+			
+			const hasGraphDeclaration = cleanedCode.includes('graph') || cleanedCode.includes('flowchart');
+			const hasConnections = cleanedCode.includes('-->') || cleanedCode.includes('---');
+			const hasNodes = /[A-Z]\[/.test(cleanedCode) || /[A-Z]\{/.test(cleanedCode) || /[A-Z]\(/.test(cleanedCode);
+			
+			// Must have graph declaration AND (connections OR nodes)
+			// Also check that there are no incomplete arrows (ending with -->)
+			const hasIncompleteArrows = /-->\s*$/.test(cleanedCode.trim());
+			
+			return hasGraphDeclaration && (hasConnections || hasNodes) && !hasIncompleteArrows;
+		} catch {
+			return false;
+		}
+	}
+
 	async function renderMermaid(mermaidCode: string) {
 		if (!browser || !mermaidInitialized) return;
 
@@ -91,12 +129,12 @@
 
 			// Generate unique ID for this diagram
 			const id = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-			// Validate and render
-			const { svg } = await mermaid.render(id, mermaidCode);
+			const clean = extractMermaidCode(mermaidCode);
 			
+			// Validate and render
+			const { svg } = await mermaid.render(id, clean);
 			renderedSvg = svg;
-			console.log('✅ mermaidrenderer done rendering');
+			
 		} catch (error) {
 			console.error('Mermaid rendering error:', error);
 			hasError = true;
@@ -119,20 +157,17 @@
 		URL.revokeObjectURL(url);
 	}
 
-	onMount(() => {
-		if (browser) {
-			console.log('🚀 mermaidrenderer is initialize');
-			initializeMermaid();
-			const mermaidCode = extractMermaidCode(content);
-			renderMermaid(mermaidCode);
-		}
-	});
-
-	// Re-render when content changes
+	// Use $effect to reactively render mermaid when content is complete
 	$effect(() => {
-		if (browser && mermaidInitialized) {
-			const mermaidCode = extractMermaidCode(content);
-			renderMermaid(mermaidCode);
+		if (browser && content) {
+			const hasComplete = hasCompleteMermaidContent(content);
+			if (hasComplete) {
+				console.log('🚀 mermaidrenderer initializing');
+				if (!mermaidInitialized) {
+					initializeMermaid();
+				}
+				renderMermaid(content);
+			}
 		}
 	});
 </script>

@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { browser } from '$app/environment';
+	import { Timeline, DataSet } from 'vis-timeline/standalone';
+	import 'vis-timeline/styles/vis-timeline-graph2d.min.css';
 
 	interface Props {
 		content: string; // Timeline data in JSON format or structured text
@@ -163,22 +165,10 @@
 				throw new Error('No timeline items found');
 			}
 
-			// Add timeout to prevent indefinite loading - reduced to 5 seconds
-			const timeoutPromise = new Promise((_, reject) => {
-				setTimeout(() => {
-					console.error('TIMELINE TIMEOUT - initialization taking too long');
-					reject(new Error('Timeline loading timeout (5s)'));
-				}, 5000);
-			});
-
-			const loadPromise = async () => {
-				// Dynamic import vis-timeline
-				const { Timeline, DataSet } = await import('vis-timeline/standalone');
+			// Create timeline directly (no more dynamic imports or timeouts!)
 				
-				// Import CSS
-				await import('vis-timeline/styles/vis-timeline-graph2d.min.css');
-				
-				// Create datasets
+			// Create datasets
+			try {
 				const items = new DataSet(timelineData.items);
 				const groups = timelineData.groups ? new DataSet(timelineData.groups) : undefined;
 				
@@ -228,8 +218,11 @@
 				};
 
 				// Create timeline
+				console.log('🚀 Timeline: Creating timeline with container:', timelineContainer);
+				console.log('🚀 Timeline: Timeline constructor available:', typeof Timeline);
 				try {
 					timeline = new Timeline(timelineContainer, items, groups, options);
+					console.log('🚀 Timeline: Timeline created successfully:', timeline);
 				} catch (timelineError) {
 					console.error('Failed to create timeline:', timelineError);
 					throw timelineError;
@@ -245,10 +238,18 @@
 
 				// Fit timeline to show all items
 				timeline.fit();
+				
+				// Give timeline a moment to render
+				setTimeout(() => {
+					console.log('🚀 Timeline: After timeout, container content:', timelineContainer.innerHTML.length, 'chars');
+					isLoading = false;
+				}, 100);
+				
 				console.log('✅ timelinerenderer done rendering');
-			};
-			// Race between loading and timeout
-			await Promise.race([loadPromise(), timeoutPromise]);
+			} catch (datasetError) {
+				console.error('🚨 Timeline DataSet creation failed:', datasetError);
+				throw datasetError;
+			}
 		} catch (error: any) {
 			console.error('Timeline initialization error:', error);
 			hasError = true;
@@ -297,39 +298,27 @@
 		return timelineContent.length > 0;
 	}
 
-	// Use onMount to initialize when component is ready
-	onMount(() => {
-		if (browser) {
-			console.log('🚀 timelinerenderer is initialize');
-			// Small delay to ensure DOM is ready
-			setTimeout(() => {
-				if (timelineContainer && !initialized && !isLoading) {
-					const hasComplete = hasCompleteTimelineContent(content);
-					if (hasComplete) {
-							initialized = true; // Set immediately to prevent multiple initializations
-						initializeTimeline().catch(error => {
-							console.error('Timeline initialization failed:', error);
-							// Only reset initialized flag if timeline creation actually failed
-							if (timeline === null) {
-								initialized = false;
-							}
-						});
+	// Use $effect to reactively initialize when content and container are ready
+	$effect(() => {
+		if (browser && timelineContainer && content && !initialized) {
+			const hasComplete = hasCompleteTimelineContent(content);
+			if (hasComplete) {
+				console.log('🚀 timelinerenderer initializing');
+				initialized = true; // Set immediately to prevent multiple initializations
+				initializeTimeline().catch(error => {
+					console.error('Timeline initialization failed:', error);
+					// Only reset initialized flag if timeline creation actually failed
+					if (timeline === null) {
+						initialized = false;
 					}
-				}
-			}, 10);
+				});
+			}
 		}
 		
-		// Cleanup on component destroy
+		// Cleanup only runs when component is destroyed
 		return () => {
-			if (timeline) {
-				try {
-					timeline.destroy();
-				} catch (e) {
-					console.warn('Error destroying timeline:', e);
-				}
-				timeline = null;
-				initialized = false;
-			}
+			// Only cleanup when component is actually being destroyed
+			// Don't destroy timeline during re-renders or it will disappear
 		};
 	});
 </script>

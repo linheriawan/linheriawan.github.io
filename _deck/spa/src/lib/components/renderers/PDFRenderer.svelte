@@ -41,31 +41,47 @@
 	}
 
 	function createPdfIframe() {
-		if (!iframeContainer || !pdfUrl) return;
+		if (!iframeContainer || !pdfUrl) {
+			console.warn('⚠️ PDFRenderer: Missing container or URL');
+			return;
+		}
 		
-		// Create iframe for PDF viewing
-		const iframe = document.createElement('iframe');
-		iframe.src = pdfUrl;
-		iframe.style.width = '100%';
-		iframe.style.height = '100%';
-		iframe.style.border = 'none';
-		iframe.style.borderRadius = '4px';
-		iframe.title = 'PDF Document';
+		console.log('📄 PDFRenderer: Creating iframe for:', pdfUrl);
 		
-		// Add error handling
-		iframe.onerror = () => {
+		try {
+			// Create iframe for PDF viewing
+			const iframe = document.createElement('iframe');
+			iframe.src = pdfUrl;
+			iframe.style.width = '100%';
+			iframe.style.height = '100%';
+			iframe.style.border = 'none';
+			iframe.style.borderRadius = '4px';
+			iframe.title = 'PDF Document';
+			
+			// Add error handling
+			iframe.onerror = (event) => {
+				console.error('📄 PDFRenderer iframe error:', event);
+				hasError = true;
+				errorMessage = 'Failed to load PDF - the browser may not support this PDF or it may be corrupted';
+				isLoading = false;
+			};
+			
+			iframe.onload = () => {
+				isLoading = false;
+				console.log('✅ pdfrenderer done rendering');
+			};
+			
+			// Clear container and add iframe
+			iframeContainer.innerHTML = '';
+			iframeContainer.appendChild(iframe);
+			console.log('📄 PDFRenderer: Iframe appended to container');
+			
+		} catch (error) {
+			console.error('💥 PDFRenderer iframe creation error:', error);
 			hasError = true;
-			errorMessage = 'Failed to load PDF - the browser may not support this PDF or it may be corrupted';
+			errorMessage = 'Failed to create PDF iframe: ' + (error instanceof Error ? error.message : 'Unknown error');
 			isLoading = false;
-		};
-		
-		iframe.onload = () => {
-			isLoading = false;
-		};
-		
-		// Clear container and add iframe
-		iframeContainer.innerHTML = '';
-		iframeContainer.appendChild(iframe);
+		}
 	}
 
 	function initializePdf() {
@@ -114,16 +130,23 @@
 	// Use effect to initialize when container is available
 	$effect(() => {
 		if (browser && iframeContainer && content && !initialized) {
+			console.log('🚀 pdfrenderer initializing');
 			initialized = true;
-			initializePdf();
+			try {
+				initializePdf();
+			} catch (error) {
+				console.error('💥 PDFRenderer initialization error:', error);
+				hasError = true;
+				errorMessage = 'Failed to initialize PDF renderer: ' + (error instanceof Error ? error.message : 'Unknown error');
+			}
 		}
 		
-		// Cleanup on component destroy
-		return () => {
-			if (iframeContainer) {
-				iframeContainer.innerHTML = '';
-			}
-		};
+		// Cleanup on component destroy - commented out to prevent clearing during streaming
+		// return () => {
+		// 	if (iframeContainer) {
+		// 		iframeContainer.innerHTML = '';
+		// 	}
+		// };
 	});
 </script>
 
@@ -203,12 +226,12 @@
 					<span>Loading PDF...</span>
 					<small class="loading-note">Using your browser's native PDF viewer</small>
 				</div>
-			{:else}
-				<div 
-					bind:this={iframeContainer}
-					class="iframe-container"
-				></div>
 			{/if}
+			<div 
+				bind:this={iframeContainer}
+				class="iframe-container"
+				style="display: {isLoading ? 'none' : 'block'}"
+			></div>
 		</div>
 	{/if}
 </div>
@@ -300,8 +323,7 @@
 
 	.iframe-container {
 		width: 100%;
-		height: 100%;
-		min-height: 500px;
+		height: 600px; /* Fixed height for consistent PDF viewing */
 		background: white;
 		border-radius: 4px;
 	}

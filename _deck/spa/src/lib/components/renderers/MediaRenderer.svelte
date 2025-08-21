@@ -19,8 +19,8 @@
 
 	// Extract content from code blocks
 	function extractContent(text: string): string {
-		// Extract from ```video or ```audio code blocks
-		const codeBlockMatch = text.match(/```(?:video|audio)\s*([\s\S]*?)\s*```/i);
+		// Extract from ```video, ```audio, or ```media code blocks
+		const codeBlockMatch = text.match(/```(?:video|audio|media)\s*([\s\S]*?)\s*```/i);
 		if (codeBlockMatch) {
 			return codeBlockMatch[1].trim();
 		}
@@ -32,13 +32,13 @@
 		const content = extractContent(text);
 		const trimmed = content;
 		
-		// Direct media URL
-		const videoMatch = trimmed.match(/^(https?:\/\/.*\.(mp4|webm|mov|avi|mkv|m4v)(\?.*)?)$/i);
+		// Direct media URL (support http/https and relative paths)
+		const videoMatch = trimmed.match(/^((https?:\/\/|\/|\.\/|\.\.\/)?.*\.(mp4|webm|mov|avi|mkv|m4v)(\?.*)?)$/i);
 		if (videoMatch) {
 			return { url: videoMatch[1], type: 'video' };
 		}
 		
-		const audioMatch = trimmed.match(/^(https?:\/\/.*\.(mp3|wav|ogg|aac|m4a|flac)(\?.*)?)$/i);
+		const audioMatch = trimmed.match(/^((https?:\/\/|\/|\.\/|\.\.\/)?.*\.(mp3|wav|ogg|aac|m4a|flac)(\?.*)?)$/i);
 		if (audioMatch) {
 			return { url: audioMatch[1], type: 'audio' };
 		}
@@ -65,13 +65,13 @@
 			};
 		}
 		
-		// URL mentioned in text
-		const urlVideoMatch = trimmed.match(/(https?:\/\/.*\.(mp4|webm|mov|avi|mkv|m4v)(\?.*)?)/i);
+		// URL mentioned in text (support http/https and relative paths)
+		const urlVideoMatch = trimmed.match(/((https?:\/\/|\/|\.\/|\.\.\/)?.*\.(mp4|webm|mov|avi|mkv|m4v)(\?.*)?)/i);
 		if (urlVideoMatch) {
 			return { url: urlVideoMatch[1], type: 'video' };
 		}
 		
-		const urlAudioMatch = trimmed.match(/(https?:\/\/.*\.(mp3|wav|ogg|aac|m4a|flac)(\?.*)?)/i);
+		const urlAudioMatch = trimmed.match(/((https?:\/\/|\/|\.\/|\.\.\/)?.*\.(mp3|wav|ogg|aac|m4a|flac)(\?.*)?)/i);
 		if (urlAudioMatch) {
 			return { url: urlAudioMatch[1], type: 'audio' };
 		}
@@ -80,14 +80,13 @@
 	}
 
 	async function initializePlayer() {
-			
-		if (!browser || !mediaContainer) {
-				isLoading = false;
+		// Prevent multiple initializations
+		if (player || !browser || !mediaContainer) {
 			return;
 		}
 
 		try {
-			console.log('🚀 mediarenderer is initialize');
+			console.log('🚀 mediarenderer initializing');
 			isLoading = true;
 			hasError = false;
 			errorMessage = '';
@@ -102,15 +101,16 @@
 			mediaType = mediaInfo.type;
 			mediaTitle = mediaInfo.title || `${mediaType.charAt(0).toUpperCase() + mediaType.slice(1)} Player`;
 
+			console.log('🚀 mediarenderer creating player for:', mediaUrl);
 	
 			// For YouTube videos, use iframe embed
 			if (mediaUrl.includes('youtube.com/embed/')) {
-					createYouTubePlayer();
+				createYouTubePlayer();
 				return;
 			}
 
 			// Use native HTML5 player for all other media
-				createNativePlayerDirect();
+			createNativePlayerDirect();
 
 		} catch (error: any) {
 			console.error('Media initialization error:', error);
@@ -137,6 +137,7 @@
 	}
 
 	function createNativePlayerDirect() {
+		console.log('🚀 mediarenderer creating native player for:', mediaType, mediaUrl);
 			
 		// Create native HTML5 element
 		const mediaElement = document.createElement(mediaType);
@@ -154,12 +155,44 @@
 			mediaElement.style.backgroundColor = '#1a1a1a';
 		}
 		
+		// Set up event handlers first
+		mediaElement.onloadstart = () => {
+			console.log('🚀 mediarenderer: loadstart event');
+		};
+		
+		mediaElement.onloadedmetadata = () => {
+			console.log('🚀 mediarenderer: loadedmetadata event');
+			isLoading = false;
+		};
+		
+		mediaElement.oncanplay = () => {
+			console.log('🚀 mediarenderer: canplay event');
+			isLoading = false;
+		};
+		
+		mediaElement.oncanplaythrough = () => {
+			console.log('🚀 mediarenderer: canplaythrough event');
+			isLoading = false;
+		};
+		
+		mediaElement.onload = () => {
+			console.log('🚀 mediarenderer: load event');
+			isLoading = false;
+		};
+		
+		mediaElement.onerror = (e) => {
+			console.error('MediaRenderer: Media error occurred', e, mediaElement.error);
+			hasError = true;
+			errorMessage = `Failed to load media file: ${mediaElement.error?.message || 'Unknown error'}`;
+			isLoading = false;
+		};
+		
 		// Add source with proper MIME type
 		const source = document.createElement('source');
 		source.src = mediaUrl;
 		source.type = getMediaMimeType(mediaUrl);
+		console.log('🚀 mediarenderer adding source:', source.src, source.type);
 		mediaElement.appendChild(source);
-		
 		
 		// Add fallback sources for better compatibility
 		if (mediaType === 'video' && !mediaUrl.includes('.webm')) {
@@ -169,36 +202,16 @@
 			mediaElement.appendChild(fallbackSource);
 		}
 		
-		// Add to container
-			mediaContainer.appendChild(mediaElement);
-		console.log('✅ mediarenderer done rendering');
-		
-		// Set up event handlers
-		mediaElement.onloadstart = () => {
-			isLoading = true;
-		};
-		
-		mediaElement.onloadedmetadata = () => {
-			isLoading = false;
-			player = mediaElement; // Store reference for controls
-		};
-		
-		mediaElement.oncanplay = () => {
-			isLoading = false;
-		};
-		
-		mediaElement.onerror = () => {
-			console.error('MediaRenderer: Media error occurred');
-			hasError = true;
-			errorMessage = 'Failed to load media file - format may not be supported';
-			isLoading = false;
-		};
-		
 		// Add accessibility
 		mediaElement.setAttribute('aria-label', mediaTitle);
 		
 		// Store reference
 		player = mediaElement;
+		
+		// Add to container
+		mediaContainer.appendChild(mediaElement);
+		console.log('🚀 mediarenderer: added element to container');
+		console.log('✅ mediarenderer done rendering');
 	}
 
 	function getMediaMimeType(url: string): string {
@@ -301,8 +314,8 @@
 	function hasCompleteMediaContent(text: string): boolean {
 		if (!text || !text.trim()) return false;
 		
-		// Extract media code block
-		const codeBlockMatch = text.match(/```(?:video|audio)\s*([\s\S]*?)\s*```/i);
+		// Extract media code block (accept video, audio, or media)
+		const codeBlockMatch = text.match(/```(?:video|audio|media)\s*([\s\S]*?)\s*```/i);
 		if (!codeBlockMatch) return false;
 		
 		const mediaContent = codeBlockMatch[1].trim();
@@ -319,15 +332,11 @@
 
 	// Use effect to initialize when container is available
 	$effect(() => {
-		// Stop triggering if already successfully initialized and rendered
-		if (initialized && (player || mediaUrl.includes('youtube.com')) && !isLoading && !hasError) {
-			return;
-		}
-		
-		// Only initialize when we have complete media content
+		// Only initialize when we have complete media content and haven't initialized yet
 		const hasComplete = hasCompleteMediaContent(content);
 		
 		if (browser && mediaContainer && hasComplete && !initialized && !player) {
+			console.log('🚀 MediaRenderer initializing player (first time)');
 			initialized = true; // Set immediately to prevent multiple initializations
 			initializePlayer();
 		}

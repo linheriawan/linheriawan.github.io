@@ -13,7 +13,14 @@
 		Title,
 		Tooltip,
 		Legend,
-		ArcElement
+		ArcElement,
+		BarController,
+		LineController,
+		DoughnutController,
+		PieController,
+		PolarAreaController,
+		RadarController,
+		ScatterController
 	} from 'chart.js';
 
 	interface Props {
@@ -29,7 +36,7 @@
 	let chartType = $state<string>('');
 	let chartData = $state<any>(null);
 
-	// Register Chart.js components
+	// Register Chart.js components and controllers
 	Chart.register(
 		CategoryScale,
 		LinearScale,
@@ -39,7 +46,14 @@
 		Title,
 		Tooltip,
 		Legend,
-		ArcElement
+		ArcElement,
+		BarController,
+		LineController,
+		DoughnutController,
+		PieController,
+		PolarAreaController,
+		RadarController,
+		ScatterController
 	);
 
 	// Chart type detection and parsing
@@ -241,16 +255,10 @@
 		}
 	}
 
-	onMount(() => {
-		if (browser) {
-			console.log('🚀 chartrenderer is initialize');
-			renderChart();
-		}
-	});
-
-	// Re-render when content changes
+	// Use $effect to reactively render chart when content and canvas are ready
 	$effect(() => {
-		if (browser && content) {
+		if (browser && chartElement && content) {
+			console.log('🚀 chartrenderer initializing');
 			renderChart();
 		}
 	});
@@ -293,6 +301,12 @@
 	</div>
 
 	<div class="chart-content">
+		<canvas 
+			bind:this={chartElement} 
+			class="chart-canvas"
+			style="display: {isLoading || hasError ? 'none' : 'block'}"
+		></canvas>
+		
 		{#if isLoading}
 			<div class="loading-container">
 				<div class="loading-spinner"></div>
@@ -314,8 +328,6 @@
 					<div class="error-code">{content}</div>
 				</details>
 			</div>
-		{:else}
-			<canvas bind:this={chartElement} class="chart-canvas"></canvas>
 		{/if}
 	</div>
 </div>
