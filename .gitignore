@@ -1,9 +1,34 @@
+# Old site assets (if needed)
 assets/fetchy.js
 assets/base.css
 tailwind.config.js
 tailwindcss
 assets/PnM.xcf
 
+# Svelte app build output (deployed via GitHub Actions, not committed)
+svelte-app/build/
+svelte-app/.svelte-kit/
+
+# Node.js dependencies
+svelte-app/node_modules/
+
+# Environment files
+svelte-app/.env
+svelte-app/.env.*
+!svelte-app/.env.example
+
+# macOS
 .DS_Store
 .DS_Store?
 ._*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+npm-debug.log*

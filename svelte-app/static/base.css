@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  .btn{ @apply cursor-pointer w-full h-fit bg-transparent text-center }
+  .btn-hf {
+    @apply btn py-1 px-2 text-white font-semibold hover:bg-blue-700 rounded-md
+  }
+  
+}
+html {scroll-behavior: smooth;}
+.t-hm{ display: grid; grid-template-rows:auto minmax(0, 1fr); }
+.stroke-black{-webkit-text-stroke: 1px black;}
+section {
+  -webkit-align-items: center;
+  align-items: center;
+  display: -webkit-flex;
+  display: -ms-flexbox;
+  display: flex;
+  -ms-flex-align: center;
+  -webkit-flex-wrap: wrap;
+  -ms-flex-wrap: wrap;
+  flex-wrap: wrap;
+  margin: 0;
+  padding: 15px;
+  position: relative;
+  width: 100%
+}
+
+section .content { width: 100vw; }
+.content--big { min-height: 175vh }
+.content--full { min-height: 100vh }
+.content--small { min-height: 40vh }
+
+
+.prlx__cont {
+  clip: rect(0,auto,auto,0);
+  height: 100%;
+  left: 0;
+  overflow: hidden;
+  position: absolute;
+  top: 0;
+  width: 100%;
+  z-index: -100
+}
+
+.prlx__cont .prlx {
+  position: fixed;
+	top: 0; /* !important; */
+	-webkit-transform: translate3d(0, 0, 0);
+	transform: translate3d(0, 0, 0);
+	-webkit-transform-style: preserve-3d;
+	transform-style: preserve-3d;
+	width: 100%;
+
+	/* BG behaviour */
+	background-position: center;
+	background-repeat: no-repeat;
+	background-size: cover;
+}

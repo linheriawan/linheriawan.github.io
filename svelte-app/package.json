@@ -1,0 +1,22 @@
+{
+	"name": "svelte-app",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"build": "vite build",
+		"preview": "vite preview",
+		"prepare": "svelte-kit sync || echo ''"
+	},
+	"devDependencies": {
+		"@sveltejs/adapter-auto": "^3.3.1",
+		"@sveltejs/kit": "^2.47.3",
+		"@sveltejs/vite-plugin-svelte": "^3.1.2",
+		"svelte": "^4.2.20",
+		"vite": "^5.4.21"
+	},
+	"dependencies": {
+		"@sveltejs/adapter-static": "^3.0.10"
+	}
+}
