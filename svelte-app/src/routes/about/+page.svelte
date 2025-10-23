@@ -1,4 +1,6 @@
 <script>
+    import SEO from '$lib/components/SEO.svelte';
+
     const experiences = [
         { period: 'Present', title: 'Full-Stack Developer', desc: 'Building web applications with PHP & JavaScript' },
         { period: 'Always', title: 'Linux Tinkerer', desc: 'Customizing distros for SBCs & embedded systems' },
@@ -13,6 +15,12 @@
         'Hardware': ['ESP32', 'Arduino', 'IoT Sensors']
     };
 </script>
+
+<SEO
+    title="About - Heriawan"
+    description="Developer, Tinkerer, Coffee Enthusiast. Full-stack developer from Indonesia building Aksara Initiative and exploring game development."
+    url="https://linheriawan.github.io/about"
+/>
 
 <div class="about-page">
     <section class="about-hero">

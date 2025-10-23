@@ -1,5 +1,6 @@
 <script>
     import { onMount } from 'svelte';
+    import SEO from '$lib/components/SEO.svelte';
 
     const skills = [
         { icon: '🚀', name: 'Aksara Initiative', desc: 'Indonesian Digital Literacy' },
@@ -70,6 +71,8 @@
         };
     });
 </script>
+
+<SEO />
 
 <!-- Hero Section -->
 <section id="top" class="hero-section">

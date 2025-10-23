@@ -1,4 +1,6 @@
 <script>
+    import SEO from '$lib/components/SEO.svelte';
+
     const lastUpdated = 'October 2025';
 
     const currentFocus = [
@@ -46,6 +48,12 @@
         'Technical documentation writing'
     ];
 </script>
+
+<SEO
+    title="What I'm Doing Now - Heriawan"
+    description="Learning Godot & Blender, tinkering with ESP32, building Aksara Initiative. Updated October 2025."
+    url="https://linheriawan.github.io/now"
+/>
 
 <div class="now-page">
     <section class="now-hero">
