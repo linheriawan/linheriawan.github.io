@@ -15,6 +15,19 @@ const config = {
 			// Leave base empty for username.github.io repos
 			// For project repos, use: base: '/repo-name'
 			base: ''
+		},
+		prerender: {
+			handleHttpError: ({ path, referrer, message }) => {
+				// Ignore 404s for links to files that don't exist yet
+				if (path.startsWith('/project/') ||
+					path.startsWith('/pdf/') ||
+					path.endsWith('.txt') ||
+					path.endsWith('.pdf')) {
+					return;
+				}
+				throw new Error(message);
+			},
+			handleMissingId: 'ignore'
 		}
 	}
 };

@@ -221,10 +221,7 @@
                 </div>
                 <div class="project-links">
                     <a href="https://github.com/linheriawan" target="_blank" class="project-link small">
-                        GitHub
-                    </a>
-                    <a href="/wierd" class="project-link small">
-                        Details
+                        View on GitHub
                     </a>
                 </div>
             </div>
@@ -240,10 +237,7 @@
                 </div>
                 <div class="project-links">
                     <a href="https://github.com/linheriawan" target="_blank" class="project-link small">
-                        GitHub
-                    </a>
-                    <a href="/wierd" class="project-link small">
-                        Details
+                        View on GitHub
                     </a>
                 </div>
             </div>
