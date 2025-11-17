@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FAQ - Aksara Notes</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 40px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 2em;
+        }
+
+        .subtitle {
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 1.1em;
+        }
+
+        .faq-item {
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #ecf0f1;
+        }
+
+        .faq-item:last-child {
+            border-bottom: none;
+        }
+
+        .question {
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 1.1em;
+        }
+
+        .answer {
+            color: #555;
+            line-height: 1.7;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin-top: 30px;
+            color: #3498db;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>❓ Frequently Asked Questions</h1>
+        <p class="subtitle">Common questions about Aksara Notes</p>
+
+        <div class="faq-item">
+            <div class="question">Q: I forgot my master password. What do I do?</div>
+            <div class="answer">A: Unfortunately, master passwords cannot be recovered. You'll need to reset the app, which will erase all data. This is by design for security.</div>
+        </div>
+
+        <div class="faq-item">
+            <div class="question">Q: Can I sync data across devices?</div>
+            <div class="answer">A: Currently, data is stored locally for security. Cloud sync is planned for future updates with end-to-end encryption.</div>
+        </div>
+
+        <div class="faq-item">
+            <div class="question">Q: How do I backup my data?</div>
+            <div class="answer">A: The backup feature is coming soon! You'll be able to create encrypted backups to your device storage.</div>
+        </div>
+
+        <div class="faq-item">
+            <div class="question">Q: Why do I need to authenticate so often?</div>
+            <div class="answer">A: This is for security. You can adjust auto-lock settings in Security Settings to reduce frequency.</div>
+        </div>
+
+        <div class="faq-item">
+            <div class="question">Q: Can I import data from other apps?</div>
+            <div class="answer">A: The database builder allows creating tables for any data structure. Manual import tools are planned for future updates.</div>
+        </div>
+
+        <div class="faq-item">
+            <div class="question">Q: Is my biometric data stored in the app?</div>
+            <div class="answer">A: No! Biometric authentication uses your device's secure enclave. No biometric data is stored in Aksara Notes.</div>
+        </div>
+
+        <div class="faq-item">
+            <div class="question">Q: How do I create complex database relationships?</div>
+            <div class="answer">A: Currently, tables are independent. Relationship features are planned for future updates.</div>
+        </div>
+
+        <a href="index.html" class="back-link">← Back to Help Center</a>
+    </div>
+</body>
+</html>

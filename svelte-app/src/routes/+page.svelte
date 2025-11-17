@@ -18,6 +18,14 @@
             github: 'https://github.com/Ak-sara'
         },
         {
+            title: 'Aksara Notes',
+            badge: 'Production',
+            desc: 'Android app for secure note-taking with custom database builder and PIN protection',
+            tech: ['Kotlin', 'Android', 'Realm'],
+            github: 'https://github.com/Ak-sara/AksaraNotes',
+            docs: '/docs/aksaranotes/index.html'
+        },
+        {
             title: 'Game Dev Experiments',
             badge: 'Learning',
             desc: 'Exploring game development with Godot and creating 3D models in Blender',
@@ -142,6 +150,11 @@
                         <a href={project.github} target="_blank" class="project-link">
                             <span>🔗 GitHub</span>
                         </a>
+                        {#if project.docs}
+                            <a href={project.docs} class="project-link docs">
+                                <span>📚 Docs</span>
+                            </a>
+                        {/if}
                     </div>
                 </div>
             {/each}
@@ -154,12 +167,18 @@
                 <p>
                     I'm also building something bigger - the <strong>Aksara Initiative</strong>,
                     a collection of open-source projects aimed at Indonesian digital literacy.
-                    This includes <strong>Aksara IS</strong> (no-code app builder),
+                    This includes <strong>Aksara Notes</strong> (secure note-taking app - already in production!),
+                    <strong>Aksara IS</strong> (no-code app builder),
                     <strong>Aksara Writer</strong> (document converter), and <strong>MerdekaOS</strong> (Indonesian Linux distro).
                 </p>
-                <a href="https://ak-sara.github.io" target="_blank" class="aksara-link">
-                    Visit Aksara Initiative →
-                </a>
+                <div class="callout-links">
+                    <a href="https://ak-sara.github.io" target="_blank" class="aksara-link">
+                        Visit Aksara Initiative →
+                    </a>
+                    <a href="/docs/aksaranotes/index.html" class="aksara-link secondary">
+                        📱 Aksara Notes Docs
+                    </a>
+                </div>
             </div>
         </div>
     </div>
@@ -760,6 +779,13 @@
         margin: 0 auto 2rem;
     }
 
+    .callout-links {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+
     .aksara-link {
         display: inline-block;
         padding: 1rem 2.5rem;
@@ -777,5 +803,24 @@
         background: #1e40af;
         transform: translateY(-2px);
         box-shadow: 0 8px 20px rgba(30, 58, 138, 0.4);
+    }
+
+    .aksara-link.secondary {
+        background: rgba(30, 58, 138, 0.2);
+        color: #1e3a8a;
+        border: 2px solid #1e3a8a;
+    }
+
+    .aksara-link.secondary:hover {
+        background: rgba(30, 58, 138, 0.3);
+        color: #1e3a8a;
+    }
+
+    .project-link.docs {
+        background: #3b82f6;
+    }
+
+    .project-link.docs:hover {
+        background: #2563eb;
     }
 </style>
