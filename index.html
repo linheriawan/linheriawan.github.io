@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Universal Device Interface - HID/Bluetooth/Serial</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 { font-size: 32px; margin-bottom: 10px; }
+        .header p { opacity: 0.9; font-size: 16px; }
+
+        .tabs {
+            display: flex;
+            background: #f5f5f5;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .tab {
+            flex: 1;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            border: none;
+            background: transparent;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            transition: all 0.3s;
+        }
+        .tab:hover { background: #ebebeb; }
+        .tab.active {
+            background: white;
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+        }
+
+        .tab-content {
+            display: none;
+            padding: 30px;
+        }
+        .tab-content.active { display: block; }
+
+        .section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .section h3 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 18px;
+        }
+
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .status.disconnected {
+            background: #ffebee;
+            color: #c62828;
+            border: 2px solid #ef9a9a;
+        }
+        .status.connected {
+            background: #e8f5e9;
+            color: #2e7d32;
+            border: 2px solid #81c784;
+        }
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        .status.connected .status-indicator { background: #4caf50; }
+        .status.disconnected .status-indicator { background: #f44336; }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .button {
+            padding: 12px 24px;
+            margin: 5px;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .button:hover { transform: translateY(-2px); box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+        .button:active { transform: translateY(0); }
+        .button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .button.primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .button.danger {
+            background: #f44336;
+            color: white;
+        }
+        .button.secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+
+        .terminal {
+            background: #1e1e1e;
+            color: #d4d4d4;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            height: 400px;
+            overflow-y: auto;
+            margin: 15px 0;
+            box-shadow: inset 0 2px 10px rgba(0,0,0,0.5);
+        }
+        .terminal .log-rx { color: #4ec9b0; }
+        .terminal .log-tx { color: #ce9178; }
+        .terminal .log-error { color: #f48771; }
+        .terminal .log-info { color: #9cdcfe; }
+        .terminal .log-success { color: #b5cea8; }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .input-group input,
+        .input-group select {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+        }
+        .input-group input:focus,
+        .input-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+            margin: 15px 0;
+        }
+        .quick-actions button {
+            padding: 10px;
+            font-size: 13px;
+        }
+
+        .info-box {
+            background: #e3f2fd;
+            border-left: 4px solid #2196f3;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 15px 0;
+        }
+        .info-box ul {
+            margin: 10px 0 10px 20px;
+        }
+        .info-box li {
+            margin: 5px 0;
+        }
+
+        .device-info {
+            background: white;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 10px 0;
+            border: 2px solid #e0e0e0;
+        }
+        .device-info .label {
+            font-weight: 600;
+            color: #666;
+            font-size: 12px;
+            text-transform: uppercase;
+        }
+        .device-info .value {
+            color: #333;
+            font-size: 14px;
+            margin-top: 5px;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔌 Universal Device Interface</h1>
+            <p>Connect and communicate with HID, Bluetooth, and Serial devices</p>
+        </div>
+
+        <div class="tabs">
+            <button class="tab active" onclick="switchTab('serial')">📡 Serial (UART)</button>
+            <button class="tab" onclick="switchTab('hid')">🎮 HID Device</button>
+            <button class="tab" onclick="switchTab('bluetooth')">📶 Bluetooth</button>
+        </div>
+
+        <!-- SERIAL TAB -->
+        <div id="serial-tab" class="tab-content active">
+            <div class="info-box">
+                <strong>📌 Supported Devices:</strong>
+                <ul>
+                    <li>EDC Machines (USB/RS232)</li>
+                    <li>POS Printers (Epson ESC/POS)</li>
+                    <li>Dot Matrix Printers</li>
+                    <li>Weight Scales (Avery Weigh-Tronix)</li>
+                    <li>SIM800L, Arduino, ESP32, any UART device</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h3>Connection</h3>
+                <div id="serial-status" class="status disconnected">
+                    <span class="status-indicator"></span>
+                    <span>Not Connected</span>
+                </div>
+
+                <div class="input-group">
+                    <select id="serial-device-profile">
+                        <option value="at">AT Commands (SIM800L)</option>
+                        <option value="escpos">ESC/POS Printer (Epson)</option>
+                        <option value="scale">Weight Scale (Raw Data)</option>
+                        <option value="edc">EDC Machine</option>
+                        <option value="raw">Raw Binary/Text</option>
+                    </select>
+                    <select id="serial-baudrate">
+                        <option value="2400">2400 baud</option>
+                        <option value="4800">4800 baud</option>
+                        <option value="9600" selected>9600 baud</option>
+                        <option value="19200">19200 baud</option>
+                        <option value="38400">38400 baud</option>
+                        <option value="57600">57600 baud</option>
+                        <option value="115200">115200 baud</option>
+                    </select>
+                </div>
+
+                <button class="button primary" onclick="serialConnect()">🔌 Connect New Device</button>
+                <button class="button secondary" onclick="serialReconnect()" id="serial-reconnect" style="display:none;">🔄 Reconnect Last Device</button>
+                <button class="button danger" onclick="serialDisconnect()" disabled id="serial-disconnect">⏹ Disconnect</button>
+            </div>
+
+            <div class="section">
+                <h3>Send Data</h3>
+                <div class="input-group">
+                    <input type="text" id="serial-input" placeholder="Enter command or data..." />
+                    <button class="button primary" onclick="serialSend()">📤 Send</button>
+                </div>
+
+                <div id="serial-quick-commands" class="quick-actions">
+                    <!-- Commands will be loaded based on device profile -->
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>Terminal</h3>
+                <div style="margin-bottom: 10px;">
+                    <label style="margin-right: 15px;">
+                        <input type="radio" name="serial-view" value="text" checked onchange="serialChangeView('text')"> Text View
+                    </label>
+                    <label style="margin-right: 15px;">
+                        <input type="radio" name="serial-view" value="hex" onchange="serialChangeView('hex')"> Hex View
+                    </label>
+                    <label>
+                        <input type="radio" name="serial-view" value="both" onchange="serialChangeView('both')"> Both
+                    </label>
+                    <button class="button secondary" onclick="clearLog('serial')" style="float: right;">🗑️ Clear</button>
+                </div>
+                <div id="serial-terminal" class="terminal"></div>
+            </div>
+        </div>
+
+        <!-- HID TAB -->
+        <div id="hid-tab" class="tab-content">
+            <div class="info-box">
+                <strong>📌 HID Device Info:</strong>
+                <ul>
+                    <li>Human Interface Devices (keyboards, mice, game controllers, custom devices)</li>
+                    <li>Requires Chrome/Edge browser</li>
+                    <li>You must select device from browser popup</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h3>Connection</h3>
+                <div id="hid-status" class="status disconnected">
+                    <span class="status-indicator"></span>
+                    <span>Not Connected</span>
+                </div>
+
+                <div id="hid-device-info" class="device-info" style="display: none;">
+                    <div class="label">Device Name</div>
+                    <div class="value" id="hid-name">-</div>
+                    <div class="label" style="margin-top: 10px;">Vendor ID / Product ID</div>
+                    <div class="value" id="hid-ids">-</div>
+                </div>
+
+                <button class="button primary" onclick="hidConnect()">🔌 Connect HID Device</button>
+                <button class="button danger" onclick="hidDisconnect()" disabled id="hid-disconnect">⏹ Disconnect</button>
+            </div>
+
+            <div class="section">
+                <h3>Send Data (Output Report)</h3>
+                <div class="input-group">
+                    <input type="text" id="hid-input" placeholder="Enter hex data (e.g., 01 02 03 04)" />
+                    <button class="button primary" onclick="hidSend()">📤 Send</button>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>Terminal</h3>
+                <button class="button secondary" onclick="clearLog('hid')" style="float: right;">🗑️ Clear</button>
+                <div id="hid-terminal" class="terminal"></div>
+            </div>
+        </div>
+
+        <!-- BLUETOOTH TAB -->
+        <div id="bluetooth-tab" class="tab-content">
+            <div class="info-box">
+                <strong>📌 Bluetooth Device Info:</strong>
+                <ul>
+                    <li>Bluetooth Low Energy (BLE) devices</li>
+                    <li>Requires Chrome/Edge browser</li>
+                    <li>You must select device from browser popup</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h3>Connection</h3>
+                <div id="bluetooth-status" class="status disconnected">
+                    <span class="status-indicator"></span>
+                    <span>Not Connected</span>
+                </div>
+
+                <div id="bluetooth-device-info" class="device-info" style="display: none;">
+                    <div class="label">Device Name</div>
+                    <div class="value" id="bluetooth-name">-</div>
+                    <div class="label" style="margin-top: 10px;">Device ID</div>
+                    <div class="value" id="bluetooth-id">-</div>
+                </div>
+
+                <div class="input-group">
+                    <input type="text" id="bluetooth-service-uuid" placeholder="Service UUID (optional, leave empty for all)" />
+                </div>
+
+                <button class="button primary" onclick="bluetoothConnect()">🔌 Connect Bluetooth Device</button>
+                <button class="button danger" onclick="bluetoothDisconnect()" disabled id="bluetooth-disconnect">⏹ Disconnect</button>
+            </div>
+
+            <div class="section">
+                <h3>Send Data</h3>
+                <div class="input-group">
+                    <input type="text" id="bluetooth-char-uuid" placeholder="Characteristic UUID" />
+                </div>
+                <div class="input-group">
+                    <input type="text" id="bluetooth-input" placeholder="Enter data to send..." />
+                    <button class="button primary" onclick="bluetoothSend()">📤 Send</button>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3>Terminal</h3>
+                <button class="button secondary" onclick="clearLog('bluetooth')" style="float: right;">🗑️ Clear</button>
+                <div id="bluetooth-terminal" class="terminal"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="device-api.js"></script>
+</body>
+</html>

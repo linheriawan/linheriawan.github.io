@@ -1,0 +1,33 @@
+{
+  "name": "clwssvc",
+  "version": "1.0.0",
+  "description": "A Node.js app that generates random values and sends them to a virtual serial port for Web Serial API testing",
+  "main": "index.js",
+  "scripts": {
+    "start": "node app.js",
+    "start:https": "node app.js --https",
+    "mock": "node index-mock.js",
+    "server": "node server.js",
+    "legacy": "node index.js",
+    "dev": "concurrently \"npm run mock\" \"npm run server\"",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "serial",
+    "web-serial-api",
+    "virtual-serial-port",
+    "nodejs"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@serialport/binding-mock": "^10.2.2",
+    "@serialport/bindings": "^10.0.1",
+    "@serialport/parser-readline": "^13.0.0",
+    "@serialport/stream": "^13.0.0",
+    "concurrently": "^9.2.1",
+    "node-hid": "^3.2.0",
+    "serialport": "^13.0.0",
+    "virtual-serialport": "^4.0.1"
+  }
+}

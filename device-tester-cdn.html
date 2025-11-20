@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Device Tester</title>
+</head>
+<body>
+<script>
+// Self-contained Device Tester - Can be injected into any page
+(function() {
+    'use strict';
+
+    // Check if already loaded
+    if (window.DeviceTesterLoaded) {
+        console.log('Device Tester already loaded!');
+        return;
+    }
+    window.DeviceTesterLoaded = true;
+
+    // Create overlay container
+    const overlay = document.createElement('div');
+    overlay.id = 'device-tester-overlay';
+    overlay.innerHTML = `
+        <style>
+            #device-tester-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 999999;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            }
+            #device-tester-modal {
+                background: white;
+                width: 90%;
+                max-width: 900px;
+                max-height: 90vh;
+                border-radius: 12px;
+                box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+            }
+            #device-tester-header {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 20px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            #device-tester-close {
+                background: rgba(255,255,255,0.2);
+                border: none;
+                color: white;
+                padding: 8px 16px;
+                border-radius: 6px;
+                cursor: pointer;
+                font-weight: 600;
+            }
+            #device-tester-close:hover {
+                background: rgba(255,255,255,0.3);
+            }
+            #device-tester-content {
+                padding: 20px;
+                overflow-y: auto;
+                flex: 1;
+            }
+            .dt-section {
+                margin: 20px 0;
+                padding: 15px;
+                background: #f9f9f9;
+                border-radius: 8px;
+                border-left: 4px solid #667eea;
+            }
+            .dt-status {
+                padding: 12px;
+                border-radius: 8px;
+                margin: 10px 0;
+                font-weight: 600;
+            }
+            .dt-status.disconnected {
+                background: #ffebee;
+                color: #c62828;
+            }
+            .dt-status.connected {
+                background: #e8f5e9;
+                color: #2e7d32;
+            }
+            .dt-button {
+                padding: 10px 20px;
+                margin: 5px;
+                border: none;
+                border-radius: 6px;
+                font-size: 14px;
+                font-weight: 600;
+                cursor: pointer;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+            }
+            .dt-button:hover {
+                opacity: 0.9;
+            }
+            .dt-button:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+            .dt-button.danger {
+                background: #f44336;
+            }
+            .dt-button.secondary {
+                background: #e0e0e0;
+                color: #333;
+            }
+            .dt-input {
+                width: 100%;
+                padding: 10px;
+                border: 2px solid #e0e0e0;
+                border-radius: 6px;
+                font-family: 'Courier New', monospace;
+                margin: 10px 0;
+            }
+            .dt-select {
+                padding: 10px;
+                border: 2px solid #e0e0e0;
+                border-radius: 6px;
+                margin: 5px;
+                font-size: 14px;
+            }
+            .dt-terminal {
+                background: #1e1e1e;
+                color: #d4d4d4;
+                padding: 15px;
+                border-radius: 8px;
+                font-family: 'Courier New', monospace;
+                font-size: 12px;
+                height: 300px;
+                overflow-y: auto;
+                margin: 10px 0;
+            }
+            .dt-terminal .log-rx { color: #4ec9b0; }
+            .dt-terminal .log-tx { color: #ce9178; }
+            .dt-terminal .log-error { color: #f48771; }
+            .dt-terminal .log-info { color: #9cdcfe; }
+            .dt-terminal .log-success { color: #b5cea8; }
+            .dt-quick-actions {
+                display: grid;
+                grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+                gap: 8px;
+                margin: 10px 0;
+            }
+        </style>
+
+        <div id="device-tester-modal">
+            <div id="device-tester-header">
+                <h2 style="margin: 0;">🔌 Device Tester</h2>
+                <button id="device-tester-close">✕ Close</button>
+            </div>
+            <div id="device-tester-content">
+                <div class="dt-section">
+                    <h3>Serial Device Connection</h3>
+                    <div id="dt-status" class="dt-status disconnected">⭕ Not Connected</div>
+
+                    <select id="dt-profile" class="dt-select">
+                        <option value="at">AT Commands (SIM800L)</option>
+                        <option value="escpos">ESC/POS Printer (Epson)</option>
+                        <option value="scale">Weight Scale (Avery)</option>
+                        <option value="edc">EDC Machine</option>
+                        <option value="raw">Raw Data</option>
+                    </select>
+
+                    <select id="dt-baud" class="dt-select">
+                        <option value="9600" selected>9600 baud</option>
+                        <option value="115200">115200 baud</option>
+                        <option value="57600">57600 baud</option>
+                        <option value="38400">38400 baud</option>
+                        <option value="19200">19200 baud</option>
+                    </select>
+
+                    <button id="dt-connect" class="dt-button">🔌 Connect New Device</button>
+                    <button id="dt-reconnect" class="dt-button secondary" style="display:none;">🔄 Reconnect Last Device</button>
+                    <button id="dt-disconnect" class="dt-button danger" disabled>⏹ Disconnect</button>
+                </div>
+
+                <div class="dt-section">
+                    <h3>Send Data</h3>
+                    <input type="text" id="dt-input" class="dt-input" placeholder="Enter command or data..." />
+                    <button id="dt-send" class="dt-button">📤 Send</button>
+
+                    <div id="dt-quick" class="dt-quick-actions"></div>
+                </div>
+
+                <div class="dt-section">
+                    <h3>Terminal</h3>
+                    <label style="margin-right: 10px;">
+                        <input type="radio" name="dt-view" value="text" checked> Text
+                    </label>
+                    <label style="margin-right: 10px;">
+                        <input type="radio" name="dt-view" value="hex"> Hex
+                    </label>
+                    <label>
+                        <input type="radio" name="dt-view" value="both"> Both
+                    </label>
+                    <button id="dt-clear" class="dt-button secondary" style="float: right;">🗑️ Clear</button>
+                    <div id="dt-terminal" class="dt-terminal"></div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(overlay);
+
+    // State
+    let serialPort = null;
+    let serialReader = null;
+    let serialWriter = null;
+    let isReading = false;
+    let viewMode = 'text';
+
+    // Device profiles
+    const profiles = {
+        at: {
+            name: 'AT Commands',
+            lineEnding: '\r\n',
+            commands: [
+                { label: 'AT', cmd: 'AT' },
+                { label: 'ATI', cmd: 'ATI' },
+                { label: 'Signal', cmd: 'AT+CSQ' },
+                { label: 'Network', cmd: 'AT+CREG?' }
+            ]
+        },
+        escpos: {
+            name: 'ESC/POS',
+            lineEnding: '',
+            commands: [
+                { label: 'Init', cmd: '\x1B\x40' },
+                { label: 'Test Print', cmd: 'Hello!\n\n\n' },
+                { label: 'Feed', cmd: '\x1B\x64\x05' },
+                { label: 'Cut', cmd: '\x1D\x56\x00' }
+            ]
+        },
+        scale: {
+            name: 'Weight Scale',
+            lineEnding: '\r\n',
+            commands: [
+                { label: 'Get Weight', cmd: 'W' },
+                { label: 'Zero', cmd: 'Z' },
+                { label: 'Tare', cmd: 'T' }
+            ]
+        },
+        edc: {
+            name: 'EDC',
+            lineEnding: '\r\n',
+            commands: [
+                { label: 'Status', cmd: 'STATUS' }
+            ]
+        },
+        raw: {
+            name: 'Raw',
+            lineEnding: '',
+            commands: []
+        }
+    };
+
+    // Helper functions
+    function bytesToHex(bytes) {
+        return Array.from(bytes).map(b => b.toString(16).padStart(2, '0')).join(' ');
+    }
+
+    function bytesToText(bytes) {
+        return Array.from(bytes).map(b => {
+            if (b >= 32 && b <= 126) return String.fromCharCode(b);
+            if (b === 10) return '\\n';
+            if (b === 13) return '\\r';
+            if (b === 9) return '\\t';
+            return `\\x${b.toString(16).padStart(2, '0')}`;
+        }).join('');
+    }
+
+    function log(message, type = 'info', bytes = null) {
+        const terminal = document.getElementById('dt-terminal');
+        const time = new Date().toLocaleTimeString();
+        const entry = document.createElement('div');
+        entry.className = `log-${type}`;
+
+        if (bytes && (type === 'rx' || type === 'tx')) {
+            const hex = bytesToHex(bytes);
+            const text = bytesToText(bytes);
+
+            if (viewMode === 'hex') {
+                entry.textContent = `[${time}] ${message} ${hex}`;
+            } else if (viewMode === 'text') {
+                entry.textContent = `[${time}] ${message} ${text}`;
+            } else {
+                entry.textContent = `[${time}] ${message}\n    HEX: ${hex}\n    TXT: ${text}`;
+            }
+        } else {
+            entry.textContent = `[${time}] ${message}`;
+        }
+
+        terminal.appendChild(entry);
+        terminal.scrollTop = terminal.scrollHeight;
+        console.log(`[DeviceTester] ${message}`);
+    }
+
+    function loadProfile() {
+        const profile = profiles[document.getElementById('dt-profile').value];
+        const quickDiv = document.getElementById('dt-quick');
+        quickDiv.innerHTML = '';
+
+        profile.commands.forEach(cmd => {
+            const btn = document.createElement('button');
+            btn.className = 'dt-button secondary';
+            btn.textContent = cmd.label;
+            btn.onclick = () => sendData(cmd.cmd);
+            quickDiv.appendChild(btn);
+        });
+    }
+
+    async function checkPreviousDevices() {
+        if (!('serial' in navigator)) return;
+
+        try {
+            const ports = await navigator.serial.getPorts();
+            if (ports.length > 0) {
+                log(`Found ${ports.length} previously authorized device(s)`, 'info');
+                document.getElementById('dt-reconnect').style.display = 'inline-block';
+            }
+        } catch (err) {
+            // Ignore errors
+        }
+    }
+
+    async function reconnect() {
+        if (!('serial' in navigator)) return;
+
+        try {
+            const ports = await navigator.serial.getPorts();
+            if (ports.length === 0) {
+                log('No previously authorized devices', 'warning');
+                return;
+            }
+
+            const baud = parseInt(document.getElementById('dt-baud').value);
+            serialPort = ports[0]; // Use first authorized device
+
+            log(`Reconnecting to last device (${baud} baud)...`, 'info');
+            await serialPort.open({ baudRate: baud });
+
+            log('✅ Reconnected!', 'success');
+            document.getElementById('dt-status').className = 'dt-status connected';
+            document.getElementById('dt-status').textContent = '✅ Connected (Remembered)';
+            document.getElementById('dt-disconnect').disabled = false;
+            document.getElementById('dt-reconnect').style.display = 'none';
+
+            serialWriter = serialPort.writable.getWriter();
+            startReading();
+
+        } catch (err) {
+            log(`❌ Reconnect error: ${err.message}`, 'error');
+            if (err.message.includes('already open')) {
+                log('Device may be in use. Try disconnecting first.', 'warning');
+            }
+        }
+    }
+
+    async function connect() {
+        if (!('serial' in navigator)) {
+            log('❌ Web Serial API not supported!', 'error');
+            alert('Web Serial API not supported. Use Chrome/Edge browser.');
+            return;
+        }
+
+        try {
+            const baud = parseInt(document.getElementById('dt-baud').value);
+            log(`Requesting serial port (${baud} baud)...`, 'info');
+
+            serialPort = await navigator.serial.requestPort();
+            await serialPort.open({ baudRate: baud });
+
+            log('✅ Connected!', 'success');
+            document.getElementById('dt-status').className = 'dt-status connected';
+            document.getElementById('dt-status').textContent = '✅ Connected';
+            document.getElementById('dt-disconnect').disabled = false;
+            document.getElementById('dt-reconnect').style.display = 'none';
+
+            serialWriter = serialPort.writable.getWriter();
+            startReading();
+
+        } catch (err) {
+            log(`❌ Error: ${err.message}`, 'error');
+        }
+    }
+
+    async function disconnect() {
+        try {
+            isReading = false;
+            if (serialReader) {
+                await serialReader.cancel();
+                serialReader.releaseLock();
+            }
+            if (serialWriter) {
+                serialWriter.releaseLock();
+            }
+            if (serialPort) {
+                await serialPort.close();
+            }
+
+            log('🔌 Disconnected', 'info');
+            document.getElementById('dt-status').className = 'dt-status disconnected';
+            document.getElementById('dt-status').textContent = '⭕ Not Connected';
+            document.getElementById('dt-disconnect').disabled = true;
+
+            // Show reconnect button after disconnect
+            checkPreviousDevices();
+
+        } catch (err) {
+            log(`❌ Error: ${err.message}`, 'error');
+        }
+    }
+
+    async function startReading() {
+        isReading = true;
+        serialReader = serialPort.readable.getReader();
+
+        try {
+            while (isReading) {
+                const { value, done } = await serialReader.read();
+                if (done) break;
+                log('RX:', 'rx', value);
+            }
+        } catch (err) {
+            if (isReading) log(`❌ Read error: ${err.message}`, 'error');
+        } finally {
+            serialReader.releaseLock();
+        }
+    }
+
+    async function sendData(data) {
+        if (!serialPort || !serialWriter) {
+            log('❌ Not connected!', 'error');
+            return;
+        }
+
+        try {
+            const profile = profiles[document.getElementById('dt-profile').value];
+            const toSend = data + profile.lineEnding;
+            const encoded = new TextEncoder().encode(toSend);
+            await serialWriter.write(encoded);
+            log('TX:', 'tx', encoded);
+        } catch (err) {
+            log(`❌ Send error: ${err.message}`, 'error');
+        }
+    }
+
+    // Event listeners
+    document.getElementById('device-tester-close').onclick = () => {
+        if (serialPort) disconnect();
+        overlay.remove();
+        window.DeviceTesterLoaded = false;
+    };
+
+    document.getElementById('dt-connect').onclick = connect;
+    document.getElementById('dt-reconnect').onclick = reconnect;
+    document.getElementById('dt-disconnect').onclick = disconnect;
+    document.getElementById('dt-send').onclick = () => {
+        const input = document.getElementById('dt-input');
+        if (input.value) {
+            sendData(input.value);
+            input.value = '';
+        }
+    };
+    document.getElementById('dt-clear').onclick = () => {
+        document.getElementById('dt-terminal').innerHTML = '';
+    };
+    document.getElementById('dt-profile').onchange = loadProfile;
+    document.querySelectorAll('input[name="dt-view"]').forEach(radio => {
+        radio.onchange = (e) => { viewMode = e.target.value; };
+    });
+
+    // Enter key support
+    document.getElementById('dt-input').onkeypress = (e) => {
+        if (e.key === 'Enter') document.getElementById('dt-send').click();
+    };
+
+    // Initial setup
+    loadProfile();
+    checkPreviousDevices(); // Check for previously authorized devices
+    log('🚀 Device Tester loaded!', 'success');
+    log('📌 Select device profile and click Connect', 'info');
+
+})();
+</script>
+</body>
+</html>
