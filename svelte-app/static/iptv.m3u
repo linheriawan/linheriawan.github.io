@@ -1,39 +1,47 @@
 #EXTM3U
-#EXTINF:-1,France24
+#EXTINF:-1 tvg-id="France24.fr",France24
 https://live.france24.com/hls/live/2037218-b/F24_EN_HI_HLS/master_2300.m3u8
-#EXTINF:-1,CNBC USA
+#EXTINF:-1 tvg-id="CNBCWorld.us",CNBC USA
 http://206.212.244.63/42/index.m3u8
-#EXTINF:-1,CNBC indo
+#EXTINF:-1 tvg-id="CNBCIndonesia.id",CNBC indo
 https://live.cnbcindonesia.com/livecnbc/smil:cnbctv.smil/playlist.m3u8
-#EXTINF:-1,DW
+#EXTINF:-1 tvg-id="DW.de",DW
 https://dwamdstream102.akamaized.net/hls/live/2015525/dwstream102/master.m3u8
-#EXTINF:-1,NHK world
+#EXTINF:-1 tvg-id="NHKWorldJapan.jp",NHK world
 https://nhk.lls.pbs.org/index.m3u8
-#EXTINF:-1,bloomberg
+#EXTINF:-1 tvg-id="BloombergTV.us",bloomberg
 https://jmp2.uk/plu-62b976b93279cb000772c6f9.m3u8
-#EXTINF:-1,bloomberg asia
+#EXTINF:-1 tvg-id="BloombergTV.us",bloomberg asia
 https://bloomberg.com/media-manifest/streams/asia.m3u8
-#EXTINF:-1,euronews
+#EXTINF:-1 tvg-id="EuronewsEnglish.fr",euronews
 https://dash4.antik.sk/live/test_euronews/playlist.m3u8
-#EXTINF:-1,BBC News uk
+#EXTINF:-1 tvg-id="BBCNews.uk",BBC News uk
 https://dash2.antik.sk/live/test_bbc_world/playlist.m3u8
-#EXTINF:-1,History us
+#EXTINF:-1 tvg-id="History.us",History us
 http://206.212.244.63/91/index.m3u8
-#EXTINF:-1,CBS
-https://jmp2.uk/plu-62310f66d5888f0007534342.m3u8
-#EXTINF:-1,CNA
+#EXTINF:-1 tvg-id="CBSNewsNewYork.us",CBS
+https://jmp2.uk/plu-5dc48170e280c80009a861ab.m3u8
+#EXTINF:-1 tvg-id="CNAOriginals.sg",CNA
 https://amg01082-cna-amg01082c1-rlaxx-us-11304.playouts.now.amagi.tv/playlist.m3u8
-#EXTINF:-1,Yahoo Fin
+#EXTINF:-1 tvg-id="YahooFinance.us",Yahoo Fin
 https://d1ewctnvcwvvvu.cloudfront.net/playlist.m3u8
-#EXTINF:-1,MTV
+#EXTINF:-1 tvg-id="MTV.us",MTV
 http://40.160.24.53/MTV/index.m3u8
-#EXTINF:-1,ANIME x HIDIVE
+#EXTINF:-1 tvg-id="AnimexHIDIVE.us",ANIME x HIDIVE
 https://jmp2.uk/plu-6793eaa4bc03978b9bc63db1.m3u8
-#EXTINF:-1,arirang
+#EXTINF:-1 tvg-id="ArirangTV.kr",arirang
 http://amdlive-ch01.ctnd.com.edgesuite.net/arirang_1ch/smil:arirang_1ch.smil/playlist.m3u8
-#EXTINF:-1,asian crush
+#EXTINF:-1 tvg-id="AsianCrush.us",asian crush
 https://linear-900.frequency.stream/dist/cineverse/900/hls/master/playlist.m3u8
-#EXTINF:-1,FashionTV Paris L'Original
+#EXTINF:-1 tvg-id="FashionTVParisLOriginal.fr",FashionTV Paris L'Original
 https://edge-fast3.evrideo.tv/bfdbb576-83f7-11f0-9f89-0200170e3e04_1000028043_HLS/manifest.m3u8
-#EXTINF:-1,INFAST
+#EXTINF:-1 tvg-id="INFAST.nl",INFAST
 https://lifestyle-rakuten.amagi.tv/playlist.m3u8
+#EXTINF:-1 tvg-id="NationalGeographic.gr",Nat Geo
+http://185.102.171.218/NatGeo/index.m3u8
+#EXTINF:-1 tvg-id="RussiaK.ru",Rossiya Kultura
+http://94.230.129.31:8080/Rossia_K/index.m3u8
+#EXTINF:-1 tvg-id="Friday.ru",Пятница!
+http://94.230.129.31:8080/Friday/index.m3u8
+#EXTINF:-1 tvg-id="CCTV3.cn",CCTV 3
+http://74.91.26.218:82/live/cctv3hd.m3u8
