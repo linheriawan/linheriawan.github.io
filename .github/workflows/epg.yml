@@ -54,6 +54,10 @@ jobs:
           cat /tmp/channels.xml
 
       - name: Grab guide data
+        env:
+          # the grabber loads the whole iptv-org database; default Node heap
+          # (~2-4GB) OOMs, public-repo runners have 16GB
+          NODE_OPTIONS: --max-old-space-size=8192
         run: |
           cd /tmp/epg
           npm run grab -- --channels=/tmp/channels.xml --output=/tmp/guide.xml --days=2 --maxConnections=10
