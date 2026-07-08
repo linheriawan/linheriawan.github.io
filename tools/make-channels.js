@@ -16,10 +16,14 @@ const path = require('path');
 
 // preferred grabber sites, best first (covers this playlist's lineup)
 const SITE_PRIORITY = [
-    'i.mjh.nz', 'tvtv.us', 'tv.mail.ru', 'tv.cctv.com',
+    'i.mjh.nz', 'tvtv.us', 'epg.iptvx.one', 'tv.cctv.com',
     'watch.whaletvplus.com', 'cubmu.com', 'maxtvgo.mk',
     'plex.tv', 'pluto.tv', 'tvguide.com', 'vidio.com'
 ];
+
+// sites that crash or block requests from GitHub Actions runners
+// (tv.mail.ru geo-blocks non-RU IPs and returns HTML, killing the grab)
+const SITE_BLOCKLIST = ['tv.mail.ru'];
 
 function siteRank(site) {
     const i = SITE_PRIORITY.indexOf(site);
@@ -60,6 +64,7 @@ console.error(`playlist: ${wanted.size} unique tvg-ids`);
 const best = new Map();
 
 for (const site of fs.readdirSync(sitesDir)) {
+    if (SITE_BLOCKLIST.includes(site)) { continue; }
     const siteDir = path.join(sitesDir, site);
     if (!fs.statSync(siteDir).isDirectory()) { continue; }
     // a site can split its map into several files (i.mjh.nz_plex.channels.xml, ...)
