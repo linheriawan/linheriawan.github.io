@@ -26,6 +26,18 @@ function siteRank(site) {
     return i === -1 ? SITE_PRIORITY.length : i;
 }
 
+/*
+ * Site maps use channel+feed ids ("DW.de@English", "BBCNews.uk@SD").
+ * We match on the base channel id and prefer the most useful feed.
+ */
+function feedRank(feed) {
+    if (!feed) { return 0; }
+    if (/english/i.test(feed)) { return 1; }
+    if (/^HD$/i.test(feed)) { return 2; }
+    if (/^SD$/i.test(feed)) { return 3; }
+    return 4;
+}
+
 function xmlEscape(s) {
     return s.replace(/&/g, '&amp;').replace(/</g, '&lt;')
         .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -48,9 +60,16 @@ console.error(`playlist: ${wanted.size} unique tvg-ids`);
 const best = new Map();
 
 for (const site of fs.readdirSync(sitesDir)) {
-    const file = path.join(sitesDir, site, `${site}.channels.xml`);
-    if (!fs.existsSync(file)) { continue; }
-    const xml = fs.readFileSync(file, 'utf8');
+    const siteDir = path.join(sitesDir, site);
+    if (!fs.statSync(siteDir).isDirectory()) { continue; }
+    // a site can split its map into several files (i.mjh.nz_plex.channels.xml, ...)
+    let xml = '';
+    for (const f of fs.readdirSync(siteDir)) {
+        if (f.endsWith('.channels.xml')) {
+            xml += fs.readFileSync(path.join(siteDir, f), 'utf8');
+        }
+    }
+    if (!xml) { continue; }
     for (const m of xml.matchAll(/<channel\s+([^>]*)>([^<]*)<\/channel>/g)) {
         const attrs = m[1];
         const attr = (name) => {
@@ -58,11 +77,20 @@ for (const site of fs.readdirSync(sitesDir)) {
             return a ? a[1] : '';
         };
         const xmltvId = attr('xmltv_id');
-        if (!wanted.has(xmltvId)) { continue; }
-        const prev = best.get(xmltvId);
-        if (!prev || siteRank(site) < siteRank(prev.site)) {
-            best.set(xmltvId, {
+        const at = xmltvId.indexOf('@');
+        const baseId = at === -1 ? xmltvId : xmltvId.substring(0, at);
+        const feed = at === -1 ? '' : xmltvId.substring(at + 1);
+        if (!wanted.has(baseId)) { continue; }
+        const prev = best.get(baseId);
+        const better = !prev ||
+            siteRank(site) < siteRank(prev.siteScore) ||
+            (siteRank(site) === siteRank(prev.siteScore) && feedRank(feed) < feedRank(prev.feed));
+        if (better) {
+            best.set(baseId, {
                 site: site,
+                siteScore: site,
+                feed: feed,
+                xmltv_id: xmltvId, // keep the @feed so the grabber targets the right feed
                 lang: attr('lang') || 'en',
                 site_id: attr('site_id'),
                 name: m[2].trim()
@@ -72,9 +100,9 @@ for (const site of fs.readdirSync(sitesDir)) {
 }
 
 const lines = ['<?xml version="1.0" encoding="UTF-8"?>', '<channels>'];
-for (const [id, ch] of [...best.entries()].sort()) {
+for (const [, ch] of [...best.entries()].sort()) {
     lines.push(`  <channel site="${xmlEscape(ch.site)}" lang="${xmlEscape(ch.lang)}" ` +
-        `xmltv_id="${xmlEscape(id)}" site_id="${xmlEscape(ch.site_id)}">${xmlEscape(ch.name)}</channel>`);
+        `xmltv_id="${xmlEscape(ch.xmltv_id)}" site_id="${xmlEscape(ch.site_id)}">${xmlEscape(ch.name)}</channel>`);
 }
 lines.push('</channels>');
 console.log(lines.join('\n'));

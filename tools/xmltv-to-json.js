@@ -52,7 +52,9 @@ for (const m of xml.matchAll(/<programme\b([^>]*)>([\s\S]*?)<\/programme>/g)) {
         const a = new RegExp(`${name}="([^"]*)"`).exec(attrs);
         return a ? a[1] : '';
     };
-    const channel = attr('channel');
+    // grabbed ids may carry a feed suffix ("DW.de@English") — the playlist
+    // tvg-ids are plain channel ids, so strip it
+    const channel = attr('channel').split('@')[0];
     const start = parseXmltvTime(attr('start'));
     const stop = parseXmltvTime(attr('stop'));
     if (!channel || isNaN(start)) { continue; }

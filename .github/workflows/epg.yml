@@ -60,7 +60,8 @@ jobs:
 
       - name: Publish XMLTV + slim JSON
         run: |
-          cp /tmp/guide.xml "$XMLTV_OUT"
+          # strip @feed suffixes from channel ids so they match plain tvg-ids
+          sed -E 's/(channel="[^"@]+)@[^"]*"/\1"/g; s/(<channel id="[^"@]+)@[^"]*"/\1"/g' /tmp/guide.xml > "$XMLTV_OUT"
           node tools/xmltv-to-json.js /tmp/guide.xml > "$JSON_OUT"
 
       - name: Commit and push
