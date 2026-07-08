@@ -1,4 +1,4 @@
-#EXTM3U
+#EXTM3U url-tvg="https://linheriawan.github.io/epg.json"
 #EXTINF:-1 tvg-id="France24.fr",France24
 https://live.france24.com/hls/live/2037218-b/F24_EN_HI_HLS/master_2300.m3u8
 #EXTINF:-1 tvg-id="CNBCWorld.us",CNBC USA

@@ -1,0 +1,84 @@
+# GitHub Actions workflow: regenerate EPG data daily from iptv-org/epg grabbers.
+#
+# Install into linheriawan.github.io as: .github/workflows/epg.yml
+# Also copy tools/make-channels.js and tools/xmltv-to-json.js into tools/ there.
+#
+# Publishes two files into svelte-app/static/ (served at the site root):
+#   guide.xml — standard XMLTV, usable by any IPTV player
+#   epg.json  — slim format the Tizen app parses fast
+#
+# IMPORTANT: commits made with the default GITHUB_TOKEN do NOT trigger
+# push-event workflows (GitHub's anti-loop rule), so deploy.yml would never
+# run and the new EPG would sit in the repo without reaching the live site.
+# The last step therefore triggers deploy.yml explicitly via workflow_dispatch.
+
+name: Update EPG
+
+on:
+  schedule:
+    - cron: '0 20 * * *' # daily 20:00 UTC = 03:00 WIB
+  push:
+    branches: ['main', 'master']
+    paths:
+      - 'svelte-app/static/iptv.m3u' # playlist changed -> regrab EPG
+      - 'tools/**'
+      - '.github/workflows/epg.yml'
+  workflow_dispatch: {}   # allows manual run from the Actions tab
+
+permissions:
+  contents: write
+  actions: write # needed to dispatch deploy.yml
+
+jobs:
+  build-epg:
+    runs-on: ubuntu-latest
+    env:
+      PLAYLIST: svelte-app/static/iptv.m3u
+      XMLTV_OUT: svelte-app/static/guide.xml
+      JSON_OUT: svelte-app/static/epg.json
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Clone iptv-org/epg
+        run: |
+          git clone --depth 1 https://github.com/iptv-org/epg /tmp/epg
+          cd /tmp/epg && npm install
+
+      - name: Build channel map from playlist
+        run: |
+          node tools/make-channels.js "$PLAYLIST" /tmp/epg/sites > /tmp/channels.xml
+          cat /tmp/channels.xml
+
+      - name: Grab guide data
+        run: |
+          cd /tmp/epg
+          npm run grab -- --channels=/tmp/channels.xml --output=/tmp/guide.xml --days=2 --maxConnections=10
+
+      - name: Publish XMLTV + slim JSON
+        run: |
+          cp /tmp/guide.xml "$XMLTV_OUT"
+          node tools/xmltv-to-json.js /tmp/guide.xml > "$JSON_OUT"
+
+      - name: Commit and push
+        id: commit
+        run: |
+          git config user.name "epg-bot"
+          git config user.email "epg-bot@users.noreply.github.com"
+          git add "$XMLTV_OUT" "$JSON_OUT"
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            git commit -m "chore: update EPG data"
+            git push
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trigger site deployment
+        if: steps.commit.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy.yml --ref "${{ github.ref_name }}"
