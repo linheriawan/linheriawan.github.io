@@ -3,7 +3,9 @@
 # Install into linheriawan.github.io as: .github/workflows/epg.yml
 # Also copy tools/make-channels.js and tools/xmltv-to-json.js into tools/ there.
 #
-# Publishes two files into svelte-app/static/ (served at the site root):
+# Publishes two files into svelte-app/static/iptv/, grouped alongside iptv.m3u
+# so Cloudflare Pages' GitHub integration can serve that one directory on its
+# own (root directory: svelte-app, build output directory: static/iptv):
 #   guide.xml — standard XMLTV, usable by any IPTV player
 #   epg.json  — slim format the Tizen app parses fast
 #
@@ -20,7 +22,7 @@ on:
   push:
     branches: ['main', 'master']
     paths:
-      - 'svelte-app/static/iptv.m3u' # playlist changed -> regrab EPG
+      - 'svelte-app/static/iptv/iptv.m3u' # playlist changed -> regrab EPG
       - 'tools/**'
       - '.github/workflows/epg.yml'
   workflow_dispatch: {}   # allows manual run from the Actions tab
@@ -33,9 +35,9 @@ jobs:
   build-epg:
     runs-on: ubuntu-latest
     env:
-      PLAYLIST: svelte-app/static/iptv.m3u
-      XMLTV_OUT: svelte-app/static/guide.xml
-      JSON_OUT: svelte-app/static/epg.json
+      PLAYLIST: svelte-app/static/iptv/iptv.m3u
+      XMLTV_OUT: svelte-app/static/iptv/guide.xml
+      JSON_OUT: svelte-app/static/iptv/epg.json
     steps:
       - uses: actions/checkout@v4
 
